@@ -1,0 +1,7 @@
+{
+  "name": "Gemini Audio Transcriber",
+  "description": "An application to transcribe Hebrew and English audio files or microphone recordings to text using the Gemini API.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
