@@ -1,8 +1,6 @@
-
 import React, { useState, useCallback } from 'react';
 import { Language } from './types';
 import { fileToBase64 } from './utils/file';
-import { transcribeAudio } from './services/gemini';
 import { Header } from './components/Header';
 import { AudioHandler } from './components/AudioHandler';
 import { TranscriptionBox } from './components/TranscriptionBox';
@@ -26,10 +24,29 @@ const App: React.FC = () => {
 
     try {
       const base64Audio = await fileToBase64(audioData.data);
-      const mimeType = audioData.data.type || 'audio/webm'; // Default for recordings
+      const mimeType = audioData.data.type || 'audio/webm';
+
+      // Call our new backend proxy endpoint instead of Gemini directly
+      const apiResponse = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base64Audio,
+          mimeType,
+          language,
+        }),
+      });
+
+      const result = await apiResponse.json();
+
+      if (!apiResponse.ok) {
+        // The serverless function returns a JSON object with an 'error' key
+        throw new Error(result.error || `Request failed with status ${apiResponse.status}`);
+      }
       
-      const result = await transcribeAudio(base64Audio, mimeType, language);
-      setTranscription(result);
+      setTranscription(result.transcription);
 
     } catch (err) {
       console.error(err);
