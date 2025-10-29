@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "/api/transcribe";
 import { Language } from '../types';
 
 const getPrompt = (language: Language): string => {
