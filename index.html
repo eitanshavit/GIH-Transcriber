@@ -16,6 +16,16 @@
 }
 </script>
 <link rel="stylesheet" href="/index.css">
+<script>
+  const allowedDomain = "https://teachers.gymnasia.co.il";
+  const ref = document.referrer;
+  const sameOrigin = ref && ref.startsWith(allowedDomain);
+
+  if (!sameOrigin) {
+    document.write("<h2 style='color:red;text-align:center;margin-top:50px;'>Access denied</h2>");
+    throw new Error("Access denied: unauthorized origin");
+  }
+</script>
 </head>
 <body class="bg-gray-900 text-white">
     <div id="root"></div>
