@@ -17,12 +17,9 @@ export const transcribeAudio = async (
   language: Language
 ): Promise<string> => {
   try {
-    // The platform is responsible for providing the API key. In a browser environment,
-    // direct access to process.env.API_KEY can be unreliable.
-    // Initializing with an empty object allows the SDK to potentially
-    // pick up credentials from the execution environment automatically.
-    // This approach is used in other official examples and resolves the "API Key must be set" error.
-    const ai = new GoogleGenAI({});
+    // The Gemini API client must be initialized using the API key from the environment variables.
+    // The platform is responsible for securely providing `process.env.API_KEY`.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const audioPart = {
       inlineData: {
@@ -44,6 +41,8 @@ export const transcribeAudio = async (
   } catch (error) {
     console.error("Error transcribing audio:", error);
     if (error instanceof Error) {
+        // Re-throw the original error to be handled by the UI component.
+        // This provides more specific feedback if the API key is missing.
         throw new Error(error.message);
     }
     throw new Error("An unknown error occurred during transcription.");
