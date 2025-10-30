@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>תמי ליל - מתמלל אודיו</title>
+    <title>Audio Transcriber</title>
     <script src="https://cdn.tailwindcss.com"></script>
 <script type="importmap">
 {
@@ -16,19 +16,6 @@
 }
 </script>
 <link rel="stylesheet" href="/index.css">
-<script>
-  (function() {
-    const allowedDomain = "https://teachers.gymnasia.co.il";
-    const ref = document.referrer || "";
-    const sameOrigin = ref.startsWith(allowedDomain);
-
-    if (!sameOrigin) {
-      // Redirect to your main site if not embedded from the allowed domain
-      window.location.replace(allowedDomain);
-      throw new Error("Access denied: unauthorized origin");
-    }
-  })();
-</script>
 </head>
 <body class="bg-gray-900 text-white">
     <div id="root"></div>
