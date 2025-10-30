@@ -16,11 +16,9 @@ export const transcribeAudio = async (
   mimeType: string,
   language: Language
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set. Please ensure it is configured.");
-  }
-
   try {
+    // The platform is responsible for providing the API key via process.env.API_KEY.
+    // We pass it directly to the library, which will handle any errors if the key is missing or invalid.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const audioPart = {
