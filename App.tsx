@@ -4,7 +4,6 @@ import { fileToBase64 } from './utils/file';
 import { Header } from './components/Header';
 import { AudioHandler } from './components/AudioHandler';
 import { TranscriptionBox } from './components/TranscriptionBox';
-import { transcribeAudio } from './services/gemini';
 
 const App: React.FC = () => {
   const [language, setLanguage] = useState<Language>(Language.HEBREW);
@@ -27,9 +26,25 @@ const App: React.FC = () => {
       const base64Audio = await fileToBase64(audioData.data);
       const mimeType = audioData.data.type || 'audio/webm';
 
-      const result = await transcribeAudio(base64Audio, mimeType, language);
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base64Audio,
+          mimeType,
+          language,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `בקשה נכשלה עם סטטוס ${response.status}`);
+      }
       
-      setTranscription(result);
+      setTranscription(data.transcription);
 
     } catch (err) {
       console.error(err);
