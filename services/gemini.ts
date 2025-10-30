@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Language } from '../types';
 
@@ -44,8 +43,8 @@ export const transcribeAudio = async (
   } catch (error) {
     console.error("Error transcribing audio:", error);
     if (error instanceof Error) {
-        return `Error during transcription: ${error.message}`;
+        throw new Error(error.message);
     }
-    return "An unknown error occurred during transcription.";
+    throw new Error("An unknown error occurred during transcription.");
   }
 };

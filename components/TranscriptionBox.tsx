@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { CopyIcon, DownloadIcon, CheckIcon } from './icons';
+import { CopyIcon, DownloadIcon, CheckIcon, TrashIcon } from './icons';
 import { Language } from '../types';
 
 interface TranscriptionBoxProps {
@@ -25,7 +24,8 @@ export const TranscriptionBox: React.FC<TranscriptionBoxProps> = ({ transcriptio
   };
 
   const handleDownload = () => {
-    const blob = new Blob([transcription], { type: 'text/plain;charset=utf-8' });
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // UTF-8 BOM
+    const blob = new Blob([bom, transcription], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -36,16 +36,20 @@ export const TranscriptionBox: React.FC<TranscriptionBoxProps> = ({ transcriptio
     URL.revokeObjectURL(url);
   };
 
+  const handleClear = () => {
+    setTranscription('');
+  };
+
   return (
     <div className="w-full bg-gray-800 rounded-lg p-4 sm:p-6 mt-6">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="text-lg font-semibold text-gray-200">Transcription</h3>
-        <div className="flex space-x-2">
+        <h3 className="text-lg font-semibold text-gray-200">תמלול</h3>
+        <div className="flex space-x-2 space-x-reverse">
           <button
             onClick={handleCopy}
             disabled={!transcription}
             className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            title="Copy to clipboard"
+            title="העתק ללוח"
           >
             {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <CopyIcon className="w-5 h-5 text-gray-300" />}
           </button>
@@ -53,9 +57,17 @@ export const TranscriptionBox: React.FC<TranscriptionBoxProps> = ({ transcriptio
             onClick={handleDownload}
             disabled={!transcription}
             className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            title="Download as .txt"
+            title="הורד כקובץ טקסט"
           >
             <DownloadIcon className="w-5 h-5 text-gray-300" />
+          </button>
+          <button
+            onClick={handleClear}
+            disabled={!transcription}
+            className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            title="נקה טקסט"
+          >
+            <TrashIcon className="w-5 h-5 text-gray-300" />
           </button>
         </div>
       </div>
