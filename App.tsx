@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Language } from './types';
 import { fileToBase64 } from './utils/file';
-import { transcribeAudio } from './services/gemini';
 import { Header } from './components/Header';
 import { AudioHandler } from './components/AudioHandler';
 import { TranscriptionBox } from './components/TranscriptionBox';
@@ -27,8 +26,25 @@ const App: React.FC = () => {
       const base64Audio = await fileToBase64(audioData.data);
       const mimeType = audioData.data.type || 'audio/webm';
 
-      const transcriptionResult = await transcribeAudio(base64Audio, mimeType, language);
-      setTranscription(transcriptionResult);
+      const apiResponse = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base64Audio,
+          mimeType,
+          language,
+        }),
+      });
+
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json().catch(() => ({ error: 'Failed to parse error response from server.' }));
+        throw new Error(errorData.error || `Request failed with status ${apiResponse.status}`);
+      }
+
+      const result = await apiResponse.json();
+      setTranscription(result.transcription);
 
     } catch (err) {
       console.error(err);
