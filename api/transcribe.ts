@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { Language } from '../types';
+import { Language } from '../types.js';
 
 const getPrompt = (language: Language): string => {
   switch (language) {
