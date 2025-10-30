@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Language } from './types';
 import { fileToBase64 } from './utils/file';
+import { transcribeAudio } from './services/gemini';
 import { Header } from './components/Header';
 import { AudioHandler } from './components/AudioHandler';
 import { TranscriptionBox } from './components/TranscriptionBox';
@@ -26,35 +27,8 @@ const App: React.FC = () => {
       const base64Audio = await fileToBase64(audioData.data);
       const mimeType = audioData.data.type || 'audio/webm';
 
-      const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          base64Audio,
-          mimeType,
-          language,
-        }),
-      });
-
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        // Try to parse the error response as JSON, otherwise use the raw text.
-        let errorMessage = `בקשה נכשלה עם סטטוס ${response.status}`;
-        try {
-            const errorData = JSON.parse(responseText);
-            errorMessage = errorData.error || responseText;
-        } catch(e) {
-            errorMessage = responseText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-      
-      // If response is OK, we expect valid JSON.
-      const data = JSON.parse(responseText);
-      setTranscription(data.transcription);
+      const transcriptionResult = await transcribeAudio(base64Audio, mimeType, language);
+      setTranscription(transcriptionResult);
 
     } catch (err) {
       console.error(err);
