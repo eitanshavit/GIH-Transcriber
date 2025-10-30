@@ -38,12 +38,22 @@ const App: React.FC = () => {
         }),
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
 
       if (!response.ok) {
-        throw new Error(data.error || `בקשה נכשלה עם סטטוס ${response.status}`);
+        // Try to parse the error response as JSON, otherwise use the raw text.
+        let errorMessage = `בקשה נכשלה עם סטטוס ${response.status}`;
+        try {
+            const errorData = JSON.parse(responseText);
+            errorMessage = errorData.error || responseText;
+        } catch(e) {
+            errorMessage = responseText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
       
+      // If response is OK, we expect valid JSON.
+      const data = JSON.parse(responseText);
       setTranscription(data.transcription);
 
     } catch (err) {
