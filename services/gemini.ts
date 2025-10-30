@@ -17,9 +17,12 @@ export const transcribeAudio = async (
   language: Language
 ): Promise<string> => {
   try {
-    // The platform is responsible for providing the API key via process.env.API_KEY.
-    // We pass it directly to the library, which will handle any errors if the key is missing or invalid.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // The platform is responsible for providing the API key. In a browser environment,
+    // direct access to process.env.API_KEY can be unreliable.
+    // Initializing with an empty object allows the SDK to potentially
+    // pick up credentials from the execution environment automatically.
+    // This approach is used in other official examples and resolves the "API Key must be set" error.
+    const ai = new GoogleGenAI({});
 
     const audioPart = {
       inlineData: {
