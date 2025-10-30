@@ -18,9 +18,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Vercel's default serverless functions expect the body to be a string.
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { base64Audio, mimeType, language } = body;
+    const { base64Audio, mimeType, language } = req.body;
 
     if (!base64Audio || !mimeType || !language) {
       return res.status(400).json({ error: 'Missing required parameters: base64Audio, mimeType, and language are required.' });

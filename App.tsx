@@ -39,8 +39,17 @@ const App: React.FC = () => {
       });
 
       if (!apiResponse.ok) {
-        const errorData = await apiResponse.json().catch(() => ({ error: 'Failed to parse error response from server.' }));
-        throw new Error(errorData.error || `Request failed with status ${apiResponse.status}`);
+        // Handle platform-specific errors first, which might not return JSON
+        if (apiResponse.status === 413) {
+            throw new Error("קובץ השמע גדול מדי. אנא נסה קובץ קטן יותר (מגבלה של כ-4MB).");
+        }
+        if (apiResponse.status === 504) {
+            throw new Error("הבקשה נתקעה (timeout). זה יכול לקרות עם קבצי שמע ארוכים. אנא נסה קובץ קצר יותר.");
+        }
+
+        // Try to parse a JSON error from our API, which is the expected format for other errors
+        const errorData = await apiResponse.json().catch(() => null);
+        throw new Error(errorData?.error || 'השרת החזיר שגיאה לא צפויה.');
       }
 
       const result = await apiResponse.json();
