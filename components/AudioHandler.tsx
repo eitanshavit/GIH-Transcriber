@@ -100,6 +100,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('googleApiKey') || '');
   const [configError, setConfigError] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [gisLoaded, setGisLoaded] = useState(false);
@@ -335,7 +336,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                     <li>Ensure the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> are enabled for your project.</li>
                     <li>Create an <strong>OAuth 2.0 Client ID</strong> of type "Web Application".</li>
                     <li className="font-bold">Under "Authorized JavaScript origins", add your app's exact URL (shown below).</li>
-                    <li className="font-bold text-amber-300">Under "Authorized redirect URIs", leave the section empty. Adding a URI here can cause a `redirect_uri_mismatch` error.</li>
+                    <li className="font-bold text-amber-300">Under "Authorized redirect URIs", leave the section empty. Adding a URI here causes the `redirect_uri_mismatch` error.</li>
                     <li>Create an <strong>API Key</strong>.</li>
                     <li className="font-bold">For the API Key, under "Website restrictions", add your app's URL in the format `your-app-name.vercel.app/*`. Do not include `https://`.</li>
                 </ol>
@@ -350,11 +351,42 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                         </code>
                     </div>
                 )}
-
-                <p className="!mt-4 text-xs text-gray-400">
-                    <strong>Note:</strong> Your keys are stored only in your browser's local storage.
-                </p>
+                <div className="!mt-4">
+                     <button onClick={() => setShowTroubleshooting(!showTroubleshooting)} className="text-xs text-amber-400 hover:underline">
+                        {showTroubleshooting ? 'Hide' : 'Still getting an error? Click for troubleshooting.'}
+                     </button>
+                </div>
             </div>
+            
+             {showTroubleshooting && (
+                <div className="w-full p-4 my-4 bg-amber-900/30 border border-amber-700 rounded-lg text-sm text-amber-200 space-y-3">
+                    <h4 className="font-bold">Troubleshooting `redirect_uri_mismatch`</h4>
+                    <p>This error is always a configuration problem in your Google Cloud Console. Follow these steps exactly:</p>
+                    <ol className="list-decimal list-inside space-y-2 text-xs">
+                       <li>
+                            <strong>Check Authorized JavaScript origins:</strong> Go to your OAuth 2.0 Client ID settings. The URI listed there must <strong className="text-white">exactly</strong> match your app's origin shown above.
+                            <ul className="list-disc list-inside ml-4 mt-1">
+                                <li>No trailing slashes.</li>
+                                <li>Correct protocol (`http` vs `https`).</li>
+                                <li>No wildcards.</li>
+                            </ul>
+                       </li>
+                        <li className="font-extrabold text-white text-base mt-2">
+                           This is the most important step:
+                        </li>
+                         <li className="!mt-0">
+                            <strong>EMPTY Authorized redirect URIs:</strong> Find the "Authorized redirect URIs" section.
+                             <strong className="text-white"> DELETE EVERY URI IN THIS LIST.</strong> It must be completely empty. This app uses a popup and does not need a redirect URI.
+                        </li>
+                        <li>
+                            <strong>Wait a Moment:</strong> After saving changes in the Google Cloud Console, wait 1-2 minutes for them to apply.
+                        </li>
+                         <li>
+                            <strong>Clear Cache:</strong> Try clearing your browser cache or opening the app in an Incognito/Private window to ensure you are not using an old, cached authentication flow.
+                        </li>
+                    </ol>
+                </div>
+            )}
 
             <div className="w-full space-y-3">
                 <input
