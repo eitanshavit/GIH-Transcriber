@@ -61,6 +61,13 @@ const App: React.FC = () => {
   const [transcription, setTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInIframe, setIsInIframe] = useState(false);
+
+  useEffect(() => {
+    // Detect if the app is running in an iframe
+    setIsInIframe(window.self !== window.top);
+  }, []);
+
 
   useEffect(() => {
     const isRtl = language === Language.HEBREW || language === Language.ARABIC;
@@ -143,7 +150,9 @@ const App: React.FC = () => {
             onAudioReady={setAudioData} 
             onDriveFileReady={setDriveFile}
             isTranscribing={isTranscribing} 
-            language={language} />
+            language={language}
+            isInIframe={isInIframe}
+             />
 
         <div className="w-full mt-6 flex justify-center">
           <button
