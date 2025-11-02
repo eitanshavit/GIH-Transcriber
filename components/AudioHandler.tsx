@@ -85,12 +85,20 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   const [clientId, setClientId] = useState(() => localStorage.getItem('googleClientId') || '');
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('googleApiKey') || '');
   const [configError, setConfigError] = useState<string | null>(null);
+  const [origin, setOrigin] = useState('');
 
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [gisLoaded, setGisLoaded] = useState(false);
   const [tokenClient, setTokenClient] = useState<any>(null);
   const [gdriveFile, setGdriveFile] = useState<{ id: string; name: string; accessToken: string} | null>(null);
   const pickerInited = useRef(false);
+
+  // --- Get current origin for instructions ---
+   useEffect(() => {
+    if (typeof window !== 'undefined') {
+        setOrigin(window.location.origin);
+    }
+  }, []);
 
   // --- Persist keys to localStorage ---
   useEffect(() => {
@@ -162,7 +170,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                 callback: (tokenResponse: any) => {
                     if (tokenResponse.error) {
                         console.error('Google Auth Error:', tokenResponse);
-                        setConfigError(`Authentication failed: ${tokenResponse.error_description || tokenResponse.error}. Please check your Client ID configuration.`);
+                        setConfigError(`Authentication failed: ${tokenResponse.error_description || tokenResponse.error}. Please check your Client ID configuration and Authorized JavaScript Origins.`);
                         return;
                     }
                     setConfigError(null);
@@ -271,8 +279,23 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                     <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Google Cloud Console</a>.</li>
                     <li>Enable the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> for your project.</li>
                     <li>Create an <strong>API Key</strong> and an <strong>OAuth 2.0 Client ID</strong> (for Web Application).</li>
-                    <li>For the OAuth Client ID, add your app's URL (e.g., `https://your-app-url.com`) to the "Authorized JavaScript origins".</li>
+                    <li>For the OAuth Client ID, you <strong>must</strong> add your app's URL to the list of <strong>"Authorized JavaScript origins"</strong>.</li>
                 </ol>
+                
+                {origin && (
+                    <div className="!mt-4 p-3 bg-indigo-900/50 border border-indigo-700 rounded-md">
+                        <p className="text-xs text-indigo-200 font-semibold">
+                            IMPORTANT: To fix the `redirect_uri_mismatch` error, add this exact URL to your "Authorized JavaScript origins":
+                        </p>
+                        <code className="block w-full bg-gray-900 text-yellow-300 p-2 mt-2 rounded-md text-sm break-all">
+                            {origin}
+                        </code>
+                        <p className="text-xs text-gray-400 mt-2">
+                            Common examples include `http://localhost:3000` for local development or `https://your-app-name.vercel.app` for production.
+                        </p>
+                    </div>
+                )}
+
                 <p className="text-xs text-gray-400">This information is stored only in your browser's local storage.</p>
             </div>
 
