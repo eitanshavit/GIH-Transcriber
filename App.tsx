@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { AudioHandler } from './components/AudioHandler';
 import { TranscriptionBox } from './components/TranscriptionBox';
 import { PasswordProtection } from './components/PasswordProtection';
+import { AudioPlayer } from './components/AudioPlayer';
 import { transcribeFromDrive } from './services/gemini';
 import { fileToBase64 } from './utils/file';
 
@@ -65,6 +66,12 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isInIframe, setIsInIframe] = useState(false);
 
+  // State for the new audio player
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [audioFileName, setAudioFileName] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+
   useEffect(() => {
     // Detect if the app is running in an iframe
     setIsInIframe(window.self !== window.top);
@@ -90,6 +97,64 @@ const App: React.FC = () => {
     document.title = title[language];
 
   }, [language]);
+
+  // Effect to load audio preview when source changes
+  useEffect(() => {
+    const loadPreview = async () => {
+      // Clean up previous blob URL if it exists to prevent memory leaks
+      if (audioPreviewUrl && audioPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(audioPreviewUrl);
+      }
+
+      if (audioData) {
+        setAudioFileName('recorded_audio.webm');
+        setAudioPreviewUrl(audioData.url);
+        setIsPreviewLoading(false);
+      } else if (driveFile) {
+        setIsPreviewLoading(true);
+        setError(null);
+        setAudioFileName(driveFile.name);
+        setAudioPreviewUrl(null); // Clear previous preview
+        try {
+          const response = await fetch('/api/drive-audio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileId: driveFile.id,
+              accessToken: driveFile.accessToken,
+            }),
+          });
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to load audio preview.');
+          }
+          const blob = await response.blob();
+          setAudioPreviewUrl(URL.createObjectURL(blob));
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+          setError(`Could not load audio preview: ${errorMessage}`);
+          setAudioPreviewUrl(null);
+        } finally {
+          setIsPreviewLoading(false);
+        }
+      } else {
+        setAudioPreviewUrl(null);
+        setAudioFileName(null);
+        setIsPreviewLoading(false);
+      }
+    };
+
+    loadPreview();
+
+    // This cleanup function is essential. It runs when the component unmounts
+    // or when the dependencies (audioData, driveFile) change before the effect runs again.
+    return () => {
+      if (audioPreviewUrl && audioPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(audioPreviewUrl);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioData, driveFile]);
 
   const handleLogin = async (password: string): Promise<string | null> => {
     try {
@@ -175,6 +240,25 @@ const App: React.FC = () => {
             language={language}
             isInIframe={isInIframe}
              />
+        
+        {isPreviewLoading && (
+          <div className="w-full flex items-center justify-center gap-3 p-4 mt-6 text-gray-400 bg-gray-800 rounded-lg">
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Loading Audio Preview...</span>
+          </div>
+        )}
+        
+        {audioPreviewUrl && audioFileName && !isPreviewLoading && (
+          <AudioPlayer 
+            src={audioPreviewUrl} 
+            fileName={audioFileName}
+            language={language}
+          />
+        )}
+
 
         <div className="w-full mt-6 flex justify-center">
           <button
