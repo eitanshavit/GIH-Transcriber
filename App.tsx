@@ -107,7 +107,8 @@ const App: React.FC = () => {
       }
 
       if (audioData) {
-        setAudioFileName('recorded_audio.webm');
+        const fileName = (audioData.data instanceof File) ? audioData.data.name : 'recorded_audio.webm';
+        setAudioFileName(fileName);
         setAudioPreviewUrl(audioData.url);
         setIsPreviewLoading(false);
       } else if (driveFile) {

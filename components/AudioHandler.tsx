@@ -34,6 +34,41 @@ const translations: Record<string, Record<Language, string>> = {
     [Language.FRENCH]: 'Enregistrer l\'audio',
     [Language.SPANISH]: 'Grabar audio',
   },
+  upload: {
+    [Language.ENGLISH]: 'Upload File',
+    [Language.HEBREW]: 'העלאת קובץ',
+    [Language.ARABIC]: 'رفع ملف',
+    [Language.FRENCH]: 'Téléverser',
+    [Language.SPANISH]: 'Subir Archivo',
+  },
+  uploadFromComputer: {
+      [Language.ENGLISH]: "Upload from Computer",
+      [Language.HEBREW]: "העלה מהמחשב",
+      [Language.ARABIC]: 'تحميل من الحاسوب',
+      [Language.FRENCH]: 'Téléverser depuis l\'ordinateur',
+      [Language.SPANISH]: 'Subir desde la Computadora',
+  },
+  fileTooLarge: {
+      [Language.ENGLISH]: "File is too large ({fileSize} MB). Please use a file smaller than {maxSize} MB, or use Google Drive for larger files.",
+      [Language.HEBREW]: "הקובץ גדול מדי ({fileSize} MB). אנא השתמש בקובץ קטן מ-{maxSize} MB, או השתמש בגוגל דרייב עבור קבצים גדולים יותר.",
+      [Language.ARABIC]: "الملف كبير جدًا ({fileSize} ميغابايت). يرجى استخدام ملف أصغر من {maxSize} ميغابايت، أو استخدام جوجل درايف للملفات الأكبر.",
+      [Language.FRENCH]: "Le fichier est trop volumineux ({fileSize} Mo). Veuillez utiliser un fichier de moins de {maxSize} Mo ou utiliser Google Drive pour les fichiers plus volumineux.",
+      [Language.SPANISH]: "El archivo es demasiado grande ({fileSize} MB). Utilice un archivo de menos de {maxSize} MB o use Google Drive para archivos más grandes.",
+  },
+  selectedFile: {
+      [Language.ENGLISH]: "Selected:",
+      [Language.HEBREW]: "נבחר:",
+      [Language.ARABIC]: "المحدد:",
+      [Language.FRENCH]: "Sélectionné:",
+      [Language.SPANISH]: "Seleccionado:",
+  },
+  clearSelection: {
+      [Language.ENGLISH]: "Clear Selection",
+      [Language.HEBREW]: "נקה בחירה",
+      [Language.ARABIC]: "مسح التحديد",
+      [Language.FRENCH]: "Effacer la sélection",
+      [Language.SPANISH]: "Limpiar selección",
+  },
   connectDrive: {
     [Language.ENGLISH]: 'Connect & Select File',
     [Language.HEBREW]: 'התחבר ובחר קובץ',
@@ -99,7 +134,7 @@ const notifyServerOfAuthorization = () => {
 };
 
 export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriveFileReady, isTranscribing, language, isInIframe }) => {
-  const [activeTab, setActiveTab] = useState<'drive' | 'record'>('drive');
+  const [activeTab, setActiveTab] = useState<'drive' | 'record' | 'upload'>('drive');
   
   // --- Google Drive State ---
   const [googleConfig, setGoogleConfig] = useState<{clientId: string; apiKey: string} | null>(null);
@@ -114,6 +149,34 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   // --- State for iframe communication ---
   const [parentAccessToken, setParentAccessToken] = useState<string | null>(null);
   const [parentApiKey, setParentApiKey] = useState<string | null>(null);
+
+  // --- State for local file upload ---
+  const [localFile, setLocalFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Recorder State & Logic ---
+  const { isRecording, audioBlob, startRecording, stopRecording, resetRecording } = useRecorder();
+  const [recordedAudio, setRecordedAudio] = useState<{ data: Blob, url: string } | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const timerIntervalRef = useRef<number | null>(null);
+
+  // --- Functions to clear audio sources ---
+
+  const handleClearLocalFile = useCallback(() => {
+    setLocalFile(null);
+    onAudioReady(null);
+    setUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [onAudioReady]);
+  
+  const handleClearRecording = useCallback(() => {
+    resetRecording();
+    setRecordedAudio(null);
+    onAudioReady(null);
+  }, [resetRecording, onAudioReady]);
 
   // --- Load Google Config from server (for standalone mode) ---
   useEffect(() => {
@@ -201,14 +264,16 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                       const file = { id: doc.id, name: doc.name, accessToken: accessToken };
                       setSelectedDriveFile(file);
                       onDriveFileReady(file);
-                      onAudioReady(null);
+                      // Clear other audio sources
+                      handleClearLocalFile();
+                      handleClearRecording();
                   }
               })
               .build();
           picker.setVisible(true);
           pickerInited.current = true;
       }
-  }, [gapiLoaded, effectiveApiKey, onDriveFileReady, onAudioReady]);
+  }, [gapiLoaded, effectiveApiKey, onDriveFileReady, handleClearLocalFile, handleClearRecording]);
 
   // --- Initialize Google Auth Client (for standalone mode) ---
   useEffect(() => {
@@ -259,20 +324,16 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     }
   };
   
-  // --- Recorder State & Logic ---
-  const { isRecording, audioBlob, startRecording, stopRecording, resetRecording } = useRecorder();
-  const [recordedAudio, setRecordedAudio] = useState<{ data: Blob, url: string } | null>(null);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const timerIntervalRef = useRef<number | null>(null);
-
   useEffect(() => {
     if (audioBlob) {
       const url = URL.createObjectURL(audioBlob);
       const newAudio = { data: audioBlob, url };
       setRecordedAudio(newAudio);
       onAudioReady(newAudio);
+      // Clear other sources
       onDriveFileReady(null);
       setSelectedDriveFile(null);
+      setLocalFile(null);
     }
   }, [audioBlob, onAudioReady, onDriveFileReady]);
 
@@ -292,17 +353,38 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   }, [isRecording]);
 
   const handleStartRecording = () => {
+    // Clear other audio sources
     setSelectedDriveFile(null);
     onDriveFileReady(null);
+    handleClearLocalFile();
     handleClearRecording();
-    onAudioReady(null);
     startRecording();
   };
   
-  const handleClearRecording = () => {
-    resetRecording();
-    setRecordedAudio(null);
-    onAudioReady(null);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (event.target) event.target.value = ''; // Allow re-selecting the same file
+
+    if (file) {
+      const MAX_SIZE_MB = 4;
+      const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+      if (file.size > MAX_SIZE_BYTES) {
+        const errorMsg = translations.fileTooLarge[language]
+          .replace('{fileSize}', (file.size / 1024 / 1024).toFixed(2))
+          .replace('{maxSize}', MAX_SIZE_MB.toString());
+        setUploadError(errorMsg);
+        handleClearLocalFile();
+        return;
+      }
+      
+      setLocalFile(file);
+      onAudioReady({ data: file, url: URL.createObjectURL(file) });
+      
+      // Clear other audio sources
+      setSelectedDriveFile(null);
+      onDriveFileReady(null);
+      handleClearRecording();
+    }
   };
 
   const formatTime = (totalSeconds: number) => {
@@ -402,6 +484,13 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
           {translations.drive[language]}
         </button>
         <button
+          onClick={() => setActiveTab('upload')}
+          disabled={isTranscribing}
+          className={`px-4 py-2 font-medium transition-colors disabled:opacity-50 ${activeTab === 'upload' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
+        >
+          {translations.upload[language]}
+        </button>
+        <button
           onClick={() => setActiveTab('record')}
           disabled={isTranscribing}
           className={`px-4 py-2 font-medium transition-colors disabled:opacity-50 ${activeTab === 'record' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
@@ -413,6 +502,44 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
       {activeTab === 'drive' && (
         <div className="flex flex-col items-center justify-center p-4 space-y-4">
            {renderDriveTab()}
+        </div>
+      )}
+
+      {activeTab === 'upload' && (
+        <div className="flex flex-col items-center justify-center p-4 space-y-4">
+          {!localFile && (
+            <label
+              className={`flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition-all duration-300 transform hover:scale-105 ${isTranscribing ? 'cursor-not-allowed bg-gray-600' : 'cursor-pointer'}`}
+            >
+              <UploadIcon className="w-8 h-8" />
+              <span className="text-xl">{translations.uploadFromComputer[language]}</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileChange}
+                accept="audio/*"
+                disabled={isTranscribing}
+              />
+            </label>
+          )}
+
+          {localFile && (
+            <div className="w-full mt-4 p-4 bg-gray-900/50 rounded-lg text-center">
+              <p className="text-sm font-medium text-gray-300 mb-2 truncate" dir="ltr">
+                {translations.selectedFile[language]} {localFile.name}
+              </p>
+              <button
+                onClick={handleClearLocalFile}
+                disabled={isTranscribing}
+                className="text-indigo-400 hover:text-indigo-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {translations.clearSelection[language]}
+              </button>
+            </div>
+          )}
+
+          {uploadError && <p className="text-sm text-red-400 mt-4 text-center">{uploadError}</p>}
         </div>
       )}
 
