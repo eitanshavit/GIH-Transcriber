@@ -335,16 +335,16 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                     <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Google Cloud Console</a>.</li>
                     <li>Ensure the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> are enabled for your project.</li>
                     <li>Create an <strong>OAuth 2.0 Client ID</strong> of type "Web Application".</li>
-                    <li className="font-bold">Under "Authorized JavaScript origins", add your app's exact URL (shown below).</li>
+                    <li className="font-bold">Under "Authorized JavaScript origins", add your app's exact URL. If you use a custom domain, you must add <strong className="text-amber-300">both</strong> your Vercel URL and your custom domain URL.</li>
                     <li className="font-bold text-amber-300">Under "Authorized redirect URIs", leave the section empty. Adding a URI here causes the `redirect_uri_mismatch` error.</li>
                     <li>Create an <strong>API Key</strong>.</li>
-                    <li className="font-bold">For the API Key, under "Website restrictions", add your app's URL in the format `your-app-name.vercel.app/*`. Do not include `https://`.</li>
+                    <li className="font-bold">For the API Key, under "Website restrictions", add entries for <strong className="text-amber-300">all domains</strong> this app is hosted on (e.g., `your-app-name.vercel.app/*` and `your-custom-domain.com/*`).</li>
                 </ol>
                 
                 {origin && (
                     <div className="!mt-4 p-3 bg-indigo-900/50 border border-indigo-700 rounded-md">
                         <p className="text-xs text-indigo-200 font-semibold">
-                            Your "Authorized JavaScript origin" is:
+                            Your current "Authorized JavaScript origin" to add is:
                         </p>
                         <code className="block w-full bg-gray-900 text-yellow-300 p-2 mt-2 rounded-md text-sm break-all">
                             {origin}
@@ -366,9 +366,9 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                        <li>
                             <strong>Check Authorized JavaScript origins:</strong> Go to your OAuth 2.0 Client ID settings. The URI listed there must <strong className="text-white">exactly</strong> match your app's origin shown above.
                             <ul className="list-disc list-inside ml-4 mt-1">
+                                <li>If you use a custom domain like `teachers.gymnasia.co.il`, you must add **both** `https://gih-transcriber.vercel.app` **and** `https://teachers.gymnasia.co.il` to the list.</li>
                                 <li>No trailing slashes.</li>
                                 <li>Correct protocol (`http` vs `https`).</li>
-                                <li>No wildcards.</li>
                             </ul>
                        </li>
                         <li className="font-extrabold text-white text-base mt-2">
