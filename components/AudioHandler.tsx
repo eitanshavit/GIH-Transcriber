@@ -92,6 +92,12 @@ const translations: Record<string, Record<Language, string>> = {
     },
 };
 
+const notifyServerOfAuthorization = () => {
+  // Fire-and-forget a request to the backend to log the authorization event.
+  fetch('/api/notify-auth', { method: 'POST' })
+    .catch(error => console.error("Could not send authorization notification:", error));
+};
+
 export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriveFileReady, isTranscribing, language, isInIframe }) => {
   const [activeTab, setActiveTab] = useState<'drive' | 'record'>('drive');
   
@@ -159,7 +165,14 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
         // NOTE: In a production app, you should add a security check for event.origin here
         // to ensure the message is from a trusted parent domain.
         if (event.data?.type === 'googleAuthToken' && event.data.token) {
-          setParentAccessToken(event.data.token);
+          // Only update and notify if the token is new
+          setParentAccessToken(currentToken => {
+            if (currentToken !== event.data.token) {
+              notifyServerOfAuthorization();
+              return event.data.token;
+            }
+            return currentToken;
+          });
           setParentApiKey(event.data.apiKey); // Expect apiKey from parent as well
           setConfigError(null);
         }
@@ -211,6 +224,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                         return;
                     }
                     setConfigError(null);
+                    notifyServerOfAuthorization(); // Send notification on successful auth
                     showPicker(tokenResponse.access_token);
                 },
             });
