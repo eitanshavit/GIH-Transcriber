@@ -96,12 +96,9 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   const [activeTab, setActiveTab] = useState<'drive' | 'record'>('drive');
   
   // --- Google Drive State ---
-  const [clientId, setClientId] = useState(() => localStorage.getItem('googleClientId') || '');
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('googleApiKey') || '');
+  const [googleConfig, setGoogleConfig] = useState<{clientId: string; apiKey: string} | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [origin, setOrigin] = useState('');
-  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
-
+  
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [gisLoaded, setGisLoaded] = useState(false);
   const [tokenClient, setTokenClient] = useState<any>(null);
@@ -110,21 +107,30 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
 
   // --- State for iframe communication ---
   const [parentAccessToken, setParentAccessToken] = useState<string | null>(null);
+  const [parentApiKey, setParentApiKey] = useState<string | null>(null);
 
-  // --- Get current origin for instructions ---
-   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        setOrigin(window.location.origin);
-    }
-  }, []);
+  // --- Load Google Config from server (for standalone mode) ---
+  useEffect(() => {
+    if (isInIframe) return; // Don't fetch if embedded, as it gets info from parent
 
-  // --- Persist keys to localStorage (for standalone mode) ---
-  useEffect(() => {
-    if (!isInIframe) localStorage.setItem('googleClientId', clientId);
-  }, [clientId, isInIframe]);
-  useEffect(() => {
-    if (!isInIframe) localStorage.setItem('googleApiKey', apiKey);
-  }, [apiKey, isInIframe]);
+    const fetchConfig = async () => {
+      try {
+        const response = await fetch('/api/config');
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Failed to load application configuration.');
+        }
+        const config = await response.json();
+        setGoogleConfig(config);
+        setConfigError(null);
+      } catch (error) {
+        console.error("Error fetching Google config:", error);
+        setConfigError(error.message);
+      }
+    };
+
+    fetchConfig();
+  }, [isInIframe]);
 
 
   // --- Load Google Scripts ---
@@ -150,13 +156,11 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   useEffect(() => {
     if (isInIframe) {
       const handleMessage = (event: MessageEvent) => {
-        // IMPORTANT: You should add a security check for event.origin here
-        // to ensure the message is from your trusted parent domain.
-        // For example: if (event.origin !== 'https://your-website.com') return;
-        
+        // NOTE: In a production app, you should add a security check for event.origin here
+        // to ensure the message is from a trusted parent domain.
         if (event.data?.type === 'googleAuthToken' && event.data.token) {
           setParentAccessToken(event.data.token);
-          setApiKey(event.data.apiKey); // Expect apiKey from parent as well
+          setParentApiKey(event.data.apiKey); // Expect apiKey from parent as well
           setConfigError(null);
         }
       };
@@ -166,15 +170,17 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     }
   }, [isInIframe]);
 
+  const effectiveApiKey = isInIframe ? parentApiKey : googleConfig?.apiKey;
+
   const showPicker = useCallback((accessToken: string) => {
-      if (gapiLoaded && !pickerInited.current && apiKey) {
+      if (gapiLoaded && !pickerInited.current && effectiveApiKey) {
           const view = new window.google.picker.View(window.google.picker.ViewId.DOCS);
           view.setMimeTypes("audio/mpeg,audio/wav,audio/x-wav,audio/mp3,audio/webm,audio/flac,audio/ogg,audio/aac");
           const picker = new window.google.picker.PickerBuilder()
               .setAppId(null)
               .setOAuthToken(accessToken)
               .addView(view)
-              .setDeveloperKey(apiKey)
+              .setDeveloperKey(effectiveApiKey)
               .setCallback((data: any) => {
                   pickerInited.current = false;
                   if (data[window.google.picker.Response.ACTION] == window.google.picker.Action.PICKED) {
@@ -189,19 +195,19 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
           picker.setVisible(true);
           pickerInited.current = true;
       }
-  }, [gapiLoaded, apiKey, onDriveFileReady, onAudioReady]);
+  }, [gapiLoaded, effectiveApiKey, onDriveFileReady, onAudioReady]);
 
   // --- Initialize Google Auth Client (for standalone mode) ---
   useEffect(() => {
-      if (!isInIframe && gisLoaded && clientId) {
+      if (!isInIframe && gisLoaded && googleConfig?.clientId) {
           try {
             const client = window.google.accounts.oauth2.initTokenClient({
-                client_id: clientId,
+                client_id: googleConfig.clientId,
                 scope: 'https://www.googleapis.com/auth/drive.readonly',
                 callback: (tokenResponse: any) => {
                     if (tokenResponse.error) {
                         console.error('Google Auth Error:', tokenResponse);
-                        setConfigError(`Authentication failed: ${tokenResponse.error_description || tokenResponse.error}. Please check your Client ID configuration and Authorized JavaScript Origins.`);
+                        setConfigError(`Authentication failed: ${tokenResponse.error_description || tokenResponse.error}. Please ensure the Google Cloud configuration is correct.`);
                         return;
                     }
                     setConfigError(null);
@@ -211,21 +217,23 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
             setTokenClient(client);
           } catch(err) {
               console.error("Error initializing Google Auth Client:", err);
-              setConfigError('Invalid Client ID. Please ensure it is correct and try again.');
+              setConfigError('Invalid Client ID format. Please check the server configuration.');
               setTokenClient(null);
           }
       } else {
           setTokenClient(null);
       }
-  }, [gisLoaded, clientId, showPicker, isInIframe]);
+  }, [gisLoaded, googleConfig, showPicker, isInIframe]);
 
 
   const handleStandaloneAuthClick = () => {
       setConfigError(null);
       if (tokenClient) {
           tokenClient.requestAccessToken({prompt: 'select_account'});
+      } else if (!googleConfig && !configError) {
+          setConfigError("Loading Google Drive configuration...");
       } else {
-          setConfigError("Google Auth Client not ready. Please check your Client ID.");
+          setConfigError("Google Auth Client is not ready. Please refresh the page.");
       }
   };
 
@@ -327,84 +335,21 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     }
     
     // Standalone mode
+    if (!googleConfig && !configError) {
+      return (
+        <div className="flex items-center justify-center gap-3 p-4 text-gray-400">
+          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Loading Google Drive Configuration...</span>
+        </div>
+      );
+    }
+    
     return (
         <>
-            <div className="w-full p-4 bg-gray-900/50 rounded-lg text-sm text-gray-300 space-y-3">
-                <p>To use Google Drive, you need to provide your own Google Cloud credentials.</p>
-                <ol className="list-decimal list-inside space-y-2 text-xs">
-                    <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Google Cloud Console</a>.</li>
-                    <li>Ensure the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> are enabled for your project.</li>
-                    <li>Create an <strong>OAuth 2.0 Client ID</strong> of type "Web Application".</li>
-                    <li className="font-bold">Under "Authorized JavaScript origins", add your app's exact URL. If you use a custom domain, you must add <strong className="text-amber-300">both</strong> your Vercel URL and your custom domain URL.</li>
-                    <li className="font-bold text-amber-300">Under "Authorized redirect URIs", leave the section empty. Adding a URI here causes the `redirect_uri_mismatch` error.</li>
-                    <li>Create an <strong>API Key</strong>.</li>
-                    <li className="font-bold">For the API Key, under "Website restrictions", add entries for <strong className="text-amber-300">all domains</strong> this app is hosted on (e.g., `your-app-name.vercel.app/*` and `your-custom-domain.com/*`).</li>
-                </ol>
-                
-                {origin && (
-                    <div className="!mt-4 p-3 bg-indigo-900/50 border border-indigo-700 rounded-md">
-                        <p className="text-xs text-indigo-200 font-semibold">
-                            Your current "Authorized JavaScript origin" to add is:
-                        </p>
-                        <code className="block w-full bg-gray-900 text-yellow-300 p-2 mt-2 rounded-md text-sm break-all">
-                            {origin}
-                        </code>
-                    </div>
-                )}
-                <div className="!mt-4">
-                     <button onClick={() => setShowTroubleshooting(!showTroubleshooting)} className="text-xs text-amber-400 hover:underline">
-                        {showTroubleshooting ? 'Hide' : 'Still getting an error? Click for troubleshooting.'}
-                     </button>
-                </div>
-            </div>
-            
-             {showTroubleshooting && (
-                <div className="w-full p-4 my-4 bg-amber-900/30 border border-amber-700 rounded-lg text-sm text-amber-200 space-y-3">
-                    <h4 className="font-bold">Troubleshooting `redirect_uri_mismatch`</h4>
-                    <p>This error is always a configuration problem in your Google Cloud Console. Follow these steps exactly:</p>
-                    <ol className="list-decimal list-inside space-y-2 text-xs">
-                       <li>
-                            <strong>Check Authorized JavaScript origins:</strong> Go to your OAuth 2.0 Client ID settings. The URI listed there must <strong className="text-white">exactly</strong> match your app's origin shown above.
-                            <ul className="list-disc list-inside ml-4 mt-1">
-                                <li>If you use a custom domain like `teachers.gymnasia.co.il`, you must add **both** `https://gih-transcriber.vercel.app` **and** `https://teachers.gymnasia.co.il` to the list.</li>
-                                <li>No trailing slashes.</li>
-                                <li>Correct protocol (`http` vs `https`).</li>
-                            </ul>
-                       </li>
-                        <li className="font-extrabold text-white text-base mt-2">
-                           This is the most important step:
-                        </li>
-                         <li className="!mt-0">
-                            <strong>EMPTY Authorized redirect URIs:</strong> Find the "Authorized redirect URIs" section.
-                             <strong className="text-white"> DELETE EVERY URI IN THIS LIST.</strong> It must be completely empty. This app uses a popup and does not need a redirect URI.
-                        </li>
-                        <li>
-                            <strong>Wait a Moment:</strong> After saving changes in the Google Cloud Console, wait 1-2 minutes for them to apply.
-                        </li>
-                         <li>
-                            <strong>Clear Cache:</strong> Try clearing your browser cache or opening the app in an Incognito/Private window to ensure you are not using an old, cached authentication flow.
-                        </li>
-                    </ol>
-                </div>
-            )}
-
-            <div className="w-full space-y-3">
-                <input
-                    type="text"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    placeholder="Enter your OAuth 2.0 Client ID"
-                    className="w-full bg-gray-900 rounded-md p-3 text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-                <input
-                    type="text"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Enter your Google Picker API Key"
-                    className="w-full bg-gray-900 rounded-md p-3 text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-            </div>
-            {configError && <p className="text-sm text-red-400">{configError}</p>}
+            {configError && <p className="text-sm text-red-400 mb-4">{configError}</p>}
             
             {selectedDriveFile ? (
                 <div className="w-full mt-4 p-4 bg-gray-900/50 rounded-lg text-center">
@@ -413,7 +358,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                     </p>
                     <button
                         onClick={handleStandaloneAuthClick}
-                        disabled={isTranscribing || !areApisReady || !tokenClient || !clientId || !apiKey}
+                        disabled={isTranscribing || !areApisReady || !tokenClient}
                         className="text-indigo-400 hover:text-indigo-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Choose another file
@@ -422,7 +367,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
             ) : (
                 <button
                 onClick={handleStandaloneAuthClick}
-                disabled={isTranscribing || !areApisReady || !tokenClient || !clientId || !apiKey}
+                disabled={isTranscribing || !areApisReady || !tokenClient}
                 className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
             >
                 { !areApisReady ? 'Loading APIs...' : translations.connectDrive[language] }
