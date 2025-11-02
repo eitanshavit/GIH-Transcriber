@@ -79,7 +79,6 @@ const translations: Record<string, Record<Language, string>> = {
 
 export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriveFileReady, isTranscribing, language }) => {
   const [activeTab, setActiveTab] = useState<'drive' | 'record'>('drive');
-  const memoizedOnAudioReady = useCallback(onAudioReady, []);
   
   // --- Google Drive State ---
   const [clientId, setClientId] = useState(() => localStorage.getItem('googleClientId') || '');
@@ -152,14 +151,14 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                       const file = { id: doc.id, name: doc.name, accessToken: accessToken };
                       setGdriveFile(file);
                       onDriveFileReady(file);
-                      memoizedOnAudioReady(null);
+                      onAudioReady(null);
                   }
               })
               .build();
           picker.setVisible(true);
           pickerInited.current = true;
       }
-  }, [gapiLoaded, apiKey, onDriveFileReady, memoizedOnAudioReady]);
+  }, [gapiLoaded, apiKey, onDriveFileReady, onAudioReady]);
 
   useEffect(() => {
       if (gisLoaded && clientId) {
@@ -209,11 +208,11 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
       const url = URL.createObjectURL(audioBlob);
       const newAudio = { data: audioBlob, url };
       setRecordedAudio(newAudio);
-      memoizedOnAudioReady(newAudio);
+      onAudioReady(newAudio);
       onDriveFileReady(null);
       setGdriveFile(null);
     }
-  }, [audioBlob, memoizedOnAudioReady, onDriveFileReady]);
+  }, [audioBlob, onAudioReady, onDriveFileReady]);
 
   useEffect(() => {
     if (isRecording) {
@@ -234,14 +233,14 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     setGdriveFile(null);
     onDriveFileReady(null);
     handleClearRecording();
-    memoizedOnAudioReady(null);
+    onAudioReady(null);
     startRecording();
   };
   
   const handleClearRecording = () => {
     resetRecording();
     setRecordedAudio(null);
-    memoizedOnAudioReady(null);
+    onAudioReady(null);
   };
 
   const formatTime = (totalSeconds: number) => {
@@ -277,16 +276,16 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                 <p>To use Google Drive, you need to provide your own Google Cloud credentials.</p>
                 <ol className="list-decimal list-inside space-y-2 text-xs">
                     <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Google Cloud Console</a>.</li>
-                    <li>Enable the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> for your project.</li>
-                    <li>Create an <strong>API Key</strong> (for the Google Picker).</li>
-                    <li>Create an <strong>OAuth 2.0 Client ID</strong> of type "Web Application" (for user authentication).</li>
+                    <li>Ensure the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> are enabled for your project.</li>
+                    <li>Create an <strong>API Key</strong>. <strong>Important:</strong> Ensure it has no restrictions, or that it's restricted to your app's URL. An "invalid key" error often means your key is restricted.</li>
+                    <li>Create an <strong>OAuth 2.0 Client ID</strong> of type "Web Application".</li>
                     <li className="font-bold">For the OAuth Client ID, you <strong>must</strong> add your app's URL to the list of <strong>"Authorized JavaScript origins"</strong>.</li>
                 </ol>
                 
                 {origin && (
                     <div className="!mt-4 p-3 bg-indigo-900/50 border border-indigo-700 rounded-md">
                         <p className="text-xs text-indigo-200 font-semibold">
-                            IMPORTANT: To fix the `redirect_uri_mismatch` error, add this exact URL to your "Authorized JavaScript origins":
+                            Add this exact URL to your "Authorized JavaScript origins":
                         </p>
                         <code className="block w-full bg-gray-900 text-yellow-300 p-2 mt-2 rounded-md text-sm break-all">
                             {origin}
@@ -295,7 +294,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                 )}
 
                 <p className="!mt-4 text-xs text-gray-400">
-                    <strong>Note:</strong> A Client Secret is not needed because this is a client-side application. Exposing a secret in the browser would be insecure. Your keys are stored only in your browser's local storage.
+                    <strong>Note:</strong> A Client Secret is not needed. Your keys are stored only in your browser's local storage.
                 </p>
             </div>
 
@@ -308,7 +307,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                     className="w-full bg-gray-900 rounded-md p-3 text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
                 <input
-                    type="password"
+                    type="text"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="Enter your Google Picker API Key"
