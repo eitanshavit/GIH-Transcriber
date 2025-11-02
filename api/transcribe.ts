@@ -1,6 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 import { Language } from '../types.js';
 
+// Vercel config to increase body size limit for this function
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 const getPrompt = (language: Language): string => {
   switch (language) {
     case Language.HEBREW:
