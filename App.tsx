@@ -89,7 +89,7 @@ const App: React.FC = () => {
     
     const title: Record<Language, string> = {
         [Language.ENGLISH]: "Audio Transcriber",
-        [Language.HEBREW]: "מתמלל אודיו",
+        [Language.HEBREW]: "תמי ליל",
         [Language.ARABIC]: "منسخ الصوت",
         [Language.FRENCH]: "Transcripteur Audio",
         [Language.SPANISH]: "Transcriptor de Audio",
