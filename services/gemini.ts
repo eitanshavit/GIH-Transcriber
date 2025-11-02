@@ -20,11 +20,24 @@ export const transcribeAudio = async (
         }),
     });
 
-    const result = await response.json();
-
     if (!response.ok) {
-        throw new Error(result.error || 'Failed to fetch transcription from the API.');
+        // If the response is not OK, the body might not be JSON.
+        // We try to get the error message from the body as text.
+        // Vercel's "Request Entity Too Large" error is plain text/html.
+        const errorText = await response.text();
+        
+        // Try to parse as JSON in case the server did send a JSON error
+        try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.error || `API Error: ${response.status}`);
+        } catch (e) {
+            // If parsing fails, it's not JSON, so use the raw text.
+            // This will now correctly show "Request Entity Too Large".
+            throw new Error(errorText || `API Error: ${response.status}`);
+        }
     }
 
+    // If response.ok is true, we can safely assume the body is JSON.
+    const result = await response.json();
     return result.transcription;
 };
