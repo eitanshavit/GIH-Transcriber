@@ -19,8 +19,8 @@ const translations = {
   transcribing: {
     [Language.ENGLISH]: 'Transcribing...',
     [Language.HEBREW]: 'מבצע תמלול...',
-    [Language.ARABIC]: '...جاري النسخ',
-    [Language.FRENCH]: 'Transcription en cours...',
+    [Language.ARABIC]: 'جاري النسخ...',
+    [Language.FRENCH]: 'Transcription...',
     [Language.SPANISH]: 'Transcribiendo...',
   },
   error: {
@@ -29,7 +29,7 @@ const translations = {
         [Language.HEBREW]: 'אנא בחר קובץ או הקלט שמע תחילה.',
         [Language.ARABIC]: 'يرجى تحديد ملف أو تسجيل صوتي أولاً.',
         [Language.FRENCH]: 'Veuillez d\'abord sélectionner un fichier ou enregistrer un audio.',
-        [Language.SPANISH]: 'Por favor, selecciona un archivo o graba un audio primero.',
+        [Language.SPANISH]: 'Por favor, seleccione un archivo o grabe audio primero.',
     },
     unknown: {
         [Language.ENGLISH]: 'An unknown error occurred.',
@@ -49,7 +49,7 @@ const translations = {
   footer: {
     [Language.ENGLISH]: 'Powered by Gemini',
     [Language.HEBREW]: 'מופעל באמצעות Gemini',
-    [Language.ARABIC]: 'بدعم من Gemini',
+    [Language.ARABIC]: 'مدعوم بواسطة Gemini',
     [Language.FRENCH]: 'Propulsé par Gemini',
     [Language.SPANISH]: 'Desarrollado por Gemini',
   }
@@ -89,8 +89,8 @@ const App: React.FC = () => {
     
     const title: Record<Language, string> = {
         [Language.ENGLISH]: "Audio Transcriber",
-        [Language.HEBREW]: "תמי ליל",
-        [Language.ARABIC]: "منسخ الصوت",
+        [Language.HEBREW]: "מתמלל אודיו",
+        [Language.ARABIC]: "ناسخ الصوت",
         [Language.FRENCH]: "Transcripteur Audio",
         [Language.SPANISH]: "Transcriptor de Audio",
     };

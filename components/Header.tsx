@@ -8,8 +8,8 @@ interface HeaderProps {
 
 const titles: Record<Language, string> = {
   [Language.ENGLISH]: "Audio Transcriber",
-  [Language.HEBREW]: "תמי ליל",
-  [Language.ARABIC]: "منسخ الصوت",
+  [Language.HEBREW]: "מתמלל אודיו",
+  [Language.ARABIC]: "转录音频",
   [Language.FRENCH]: "Transcripteur Audio",
   [Language.SPANISH]: "Transcriptor de Audio",
 };
@@ -38,19 +38,19 @@ export const Header: React.FC<HeaderProps> = ({ language, setLanguage }) => {
         >
           עברית
         </button>
-         <button
+        <button
           onClick={() => setLanguage(Language.ARABIC)}
           className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${language === Language.ARABIC ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
         >
           العربية
         </button>
-         <button
+        <button
           onClick={() => setLanguage(Language.FRENCH)}
           className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${language === Language.FRENCH ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
         >
           Français
         </button>
-         <button
+        <button
           onClick={() => setLanguage(Language.SPANISH)}
           className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${language === Language.SPANISH ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
         >

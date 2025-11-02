@@ -15,16 +15,16 @@ async function streamToBuffer(stream) {
 const getPrompt = (language: Language): string => {
   switch (language) {
     case Language.HEBREW:
-      return "תמלל את האודיו הבא לטקסט בעברית. התמלול צריך להיות מדויק לחלוטין.";
+      return "תמלל את האודיו הבא לטקסט בעברית. התמלול צריך להיות מדויק לחלוטין. במידת האפשר, חלק את הטקסט לפסקאות.";
     case Language.ARABIC:
-      return "نسّخ الصوت التالي إلى نص باللغة العربية. يجب أن يكون النسخ دقيقًا تمامًا.";
+      return "قم بنسخ الصوت التالي إلى نص باللغة العربية. يجب أن يكون النسخ دقيقًا تمامًا. وحيثما كان ذلك مناسبًا، قم بتقسيم النص إلى فقرات.";
     case Language.FRENCH:
-      return "Transcrivez l'audio suivant en texte français. La transcription doit être parfaitement exacte.";
+        return "Transcrivez l'audio suivant en texte français. La transcription doit être parfaitement exacte. Le cas échéant, divisez le texte en paragraphes.";
     case Language.SPANISH:
-      return "Transcribe el siguiente audio a texto en español. La transcripción debe ser perfectamente precisa.";
+        return "Transcriba el siguiente audio a texto en español. La transcripción debe ser perfectamente precisa. Cuando sea apropiado, divida el texto en párrafos.";
     case Language.ENGLISH:
     default:
-      return "Transcribe the following audio to English text. The transcription should be perfectly accurate.";
+      return "Transcribe the following audio to English text. The transcription should be perfectly accurate. Where appropriate, break the text into paragraphs.";
   }
 };
 
