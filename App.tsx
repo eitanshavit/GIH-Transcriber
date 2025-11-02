@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Language } from './types';
 import { Header } from './components/Header';
 import { AudioHandler } from './components/AudioHandler';
@@ -7,6 +7,7 @@ import { PasswordProtection } from './components/PasswordProtection';
 import { AudioPlayer } from './components/AudioPlayer';
 import { transcribeFromDrive } from './services/gemini';
 import { fileToBase64 } from './utils/file';
+import { StopIcon } from './components/icons';
 
 const translations = {
   transcribeFile: {
@@ -16,11 +17,18 @@ const translations = {
     [Language.FRENCH]: 'Transcrire l\'Audio',
     [Language.SPANISH]: 'Transcribir Audio',
   },
+  stopTranscribing: {
+    [Language.ENGLISH]: 'Stop Transcribing',
+    [Language.HEBREW]: 'עצור תמלול',
+    [Language.ARABIC]: 'إيقاف النسخ',
+    [Language.FRENCH]: 'Arrêter la Transcription',
+    [Language.SPANISH]: 'Detener Transcripción',
+  },
   transcribing: {
     [Language.ENGLISH]: 'Transcribing...',
     [Language.HEBREW]: 'מבצע תמלול...',
-    [Language.ARABIC]: 'جاري النسخ...',
-    [Language.FRENCH]: 'Transcription...',
+    [Language.ARABIC]: '...جاري النسخ',
+    [Language.FRENCH]: 'Transcription en cours...',
     [Language.SPANISH]: 'Transcribiendo...',
   },
   error: {
@@ -29,7 +37,7 @@ const translations = {
         [Language.HEBREW]: 'אנא בחר קובץ או הקלט שמע תחילה.',
         [Language.ARABIC]: 'يرجى تحديد ملف أو تسجيل صوتي أولاً.',
         [Language.FRENCH]: 'Veuillez d\'abord sélectionner un fichier ou enregistrer un audio.',
-        [Language.SPANISH]: 'Por favor, seleccione un archivo o grabe audio primero.',
+        [Language.SPANISH]: 'Por favor, selecciona un archivo o graba un audio primero.',
     },
     unknown: {
         [Language.ENGLISH]: 'An unknown error occurred.',
@@ -49,7 +57,7 @@ const translations = {
   footer: {
     [Language.ENGLISH]: 'Powered by Gemini',
     [Language.HEBREW]: 'מופעל באמצעות Gemini',
-    [Language.ARABIC]: 'مدعوم بواسطة Gemini',
+    [Language.ARABIC]: 'بدعم من Gemini',
     [Language.FRENCH]: 'Propulsé par Gemini',
     [Language.SPANISH]: 'Desarrollado por Gemini',
   }
@@ -71,6 +79,8 @@ const App: React.FC = () => {
   const [audioFileName, setAudioFileName] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
 
   useEffect(() => {
     // Detect if the app is running in an iframe
@@ -90,7 +100,7 @@ const App: React.FC = () => {
     const title: Record<Language, string> = {
         [Language.ENGLISH]: "Audio Transcriber",
         [Language.HEBREW]: "מתמלל אודיו",
-        [Language.ARABIC]: "ناسخ الصوت",
+        [Language.ARABIC]: "منسخ الصوت",
         [Language.FRENCH]: "Transcripteur Audio",
         [Language.SPANISH]: "Transcriptor de Audio",
     };
@@ -186,6 +196,9 @@ const App: React.FC = () => {
       return;
     }
     
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setIsTranscribing(true);
     setError(null);
     setTranscription('');
@@ -193,7 +206,7 @@ const App: React.FC = () => {
     try {
       let result = '';
       if (driveFile) {
-        result = await transcribeFromDrive(driveFile.id, driveFile.accessToken, language);
+        result = await transcribeFromDrive(driveFile.id, driveFile.accessToken, language, signal);
       } else if (audioData) {
         const base64Audio = await fileToBase64(audioData.data);
         const response = await fetch('/api/transcribe', {
@@ -204,6 +217,7 @@ const App: React.FC = () => {
                 mimeType: audioData.data.type || 'audio/webm',
                 language,
             }),
+            signal, // Pass the signal to fetch
         });
         if (!response.ok) {
             const errorText = await response.text();
@@ -213,17 +227,32 @@ const App: React.FC = () => {
         result = json.transcription;
 
       }
-      setTranscription(result);
+      if (!signal.aborted) {
+         setTranscription(result);
+      }
 
     } catch (err) {
-      console.error(err);
-      const errorMessage = err instanceof Error ? err.message : translations.error.unknown[language];
-      setError(`${translations.error.transcriptionFailed[language]} ${errorMessage}`);
-      setTranscription('');
+      if (err.name === 'AbortError') {
+        console.log('Transcription aborted by user.');
+        setError(null);
+        setTranscription('');
+      } else {
+        console.error(err);
+        const errorMessage = err instanceof Error ? err.message : translations.error.unknown[language];
+        setError(`${translations.error.transcriptionFailed[language]} ${errorMessage}`);
+        setTranscription('');
+      }
     } finally {
       setIsTranscribing(false);
+      abortControllerRef.current = null;
     }
   }, [audioData, driveFile, language]);
+
+  const handleStopTranscribe = () => {
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+    }
+  };
   
   if (!isAuthenticated) {
     return <PasswordProtection onLogin={handleLogin} />;
@@ -264,17 +293,18 @@ const App: React.FC = () => {
 
         <div className="w-full mt-6 flex justify-center">
           <button
-            onClick={handleTranscribe}
-            disabled={(!audioData && !driveFile) || isTranscribing}
-            className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 min-h-[52px] w-64 flex items-center justify-center"
+            onClick={isTranscribing ? handleStopTranscribe : handleTranscribe}
+            disabled={!isTranscribing && (!audioData && !driveFile)}
+            className={`px-8 py-3 text-white font-bold rounded-lg shadow-lg disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 min-h-[52px] w-64 flex items-center justify-center ${
+              isTranscribing
+                ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500 disabled:bg-gray-600'
+            }`}
           >
             {isTranscribing ? (
               <div className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 rtl:ml-3 rtl:-mr-1 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {translations.transcribing[language]}
+                  <StopIcon className="mr-3 rtl:ml-3 h-5 w-5 text-white" />
+                  {translations.stopTranscribing[language]}
               </div>
             ) : translations.transcribeFile[language]}
           </button>

@@ -3,7 +3,8 @@ import { Language } from '../types';
 export const transcribeFromDrive = async (
     fileId: string,
     accessToken: string,
-    language: Language
+    language: Language,
+    signal?: AbortSignal
 ): Promise<string> => {
     const response = await fetch('/api/transcribe-from-drive', {
         method: 'POST',
@@ -15,6 +16,7 @@ export const transcribeFromDrive = async (
             accessToken,
             language,
         }),
+        signal,
     });
 
     if (!response.ok) {
