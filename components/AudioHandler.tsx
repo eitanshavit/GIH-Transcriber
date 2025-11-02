@@ -334,9 +334,10 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                     <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Google Cloud Console</a>.</li>
                     <li>Ensure the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> are enabled for your project.</li>
                     <li>Create an <strong>OAuth 2.0 Client ID</strong> of type "Web Application".</li>
-                    <li className="font-bold">Under "Authorized JavaScript origins", add your app's exact URL.</li>
+                    <li className="font-bold">Under "Authorized JavaScript origins", add your app's exact URL (shown below).</li>
+                    <li className="font-bold text-amber-300">Under "Authorized redirect URIs", leave the section empty. Adding a URI here can cause a `redirect_uri_mismatch` error.</li>
                     <li>Create an <strong>API Key</strong>.</li>
-                    <li className="font-bold">For the API Key, under "Website restrictions", add your app's URL in the format `your-app-name.vercel.app/*`. Do not include `https://`. An "invalid key" error is almost always caused by this restriction being misconfigured.</li>
+                    <li className="font-bold">For the API Key, under "Website restrictions", add your app's URL in the format `your-app-name.vercel.app/*`. Do not include `https://`.</li>
                 </ol>
                 
                 {origin && (
@@ -351,7 +352,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                 )}
 
                 <p className="!mt-4 text-xs text-gray-400">
-                    <strong>Note:</strong> A Client Secret is not needed. Your keys are stored only in your browser's local storage.
+                    <strong>Note:</strong> Your keys are stored only in your browser's local storage.
                 </p>
             </div>
 
