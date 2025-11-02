@@ -278,8 +278,9 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                 <ol className="list-decimal list-inside space-y-2 text-xs">
                     <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Google Cloud Console</a>.</li>
                     <li>Enable the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> for your project.</li>
-                    <li>Create an <strong>API Key</strong> and an <strong>OAuth 2.0 Client ID</strong> (for Web Application).</li>
-                    <li>For the OAuth Client ID, you <strong>must</strong> add your app's URL to the list of <strong>"Authorized JavaScript origins"</strong>.</li>
+                    <li>Create an <strong>API Key</strong> (for the Google Picker).</li>
+                    <li>Create an <strong>OAuth 2.0 Client ID</strong> of type "Web Application" (for user authentication).</li>
+                    <li className="font-bold">For the OAuth Client ID, you <strong>must</strong> add your app's URL to the list of <strong>"Authorized JavaScript origins"</strong>.</li>
                 </ol>
                 
                 {origin && (
@@ -290,13 +291,12 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                         <code className="block w-full bg-gray-900 text-yellow-300 p-2 mt-2 rounded-md text-sm break-all">
                             {origin}
                         </code>
-                        <p className="text-xs text-gray-400 mt-2">
-                            Common examples include `http://localhost:3000` for local development or `https://your-app-name.vercel.app` for production.
-                        </p>
                     </div>
                 )}
 
-                <p className="text-xs text-gray-400">This information is stored only in your browser's local storage.</p>
+                <p className="!mt-4 text-xs text-gray-400">
+                    <strong>Note:</strong> A Client Secret is not needed because this is a client-side application. Exposing a secret in the browser would be insecure. Your keys are stored only in your browser's local storage.
+                </p>
             </div>
 
             <div className="w-full space-y-3">
@@ -304,14 +304,14 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                     type="text"
                     value={clientId}
                     onChange={(e) => setClientId(e.target.value)}
-                    placeholder="Enter your Google Client ID"
+                    placeholder="Enter your OAuth 2.0 Client ID"
                     className="w-full bg-gray-900 rounded-md p-3 text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
                 <input
                     type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Enter your Google API Key"
+                    placeholder="Enter your Google Picker API Key"
                     className="w-full bg-gray-900 rounded-md p-3 text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
             </div>
