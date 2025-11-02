@@ -20,7 +20,7 @@ interface AudioHandlerProps {
   onError: (message: string | null) => void;
 }
 
-const translations: Record<string, Record<Language, string>> = {
+const translations: Record<string, Record<Language, string>> = { 
   drive: {
     [Language.ENGLISH]: 'Google Drive',
     [Language.HEBREW]: 'גוגל דרייב',
