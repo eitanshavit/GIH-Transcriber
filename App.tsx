@@ -1,53 +1,32 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Language } from './types';
-import { fileToBase64 } from './utils/file';
 import { Header } from './components/Header';
 import { AudioHandler } from './components/AudioHandler';
 import { TranscriptionBox } from './components/TranscriptionBox';
+import { transcribeAudio } from './services/gemini';
 
 const translations = {
   transcribeFile: {
-    [Language.ENGLISH]: 'Transcribe File',
-    [Language.HEBREW]: 'תמלל קובץ',
-    [Language.ARABIC]: 'نسخ الملف',
-    [Language.FRENCH]: 'Transcrire le fichier',
-    [Language.SPANISH]: 'Transcribir archivo',
+    [Language.ENGLISH]: 'Transcribe Audio',
+    [Language.HEBREW]: 'תמלל אודיו',
+    [Language.ARABIC]: 'نسخ الصوت',
+    [Language.FRENCH]: 'Transcrire l\'Audio',
+    [Language.SPANISH]: 'Transcribir Audio',
   },
   transcribing: {
     [Language.ENGLISH]: 'Transcribing...',
     [Language.HEBREW]: 'מבצע תמלול...',
-    [Language.ARABIC]: 'جاري النسخ...',
-    [Language.FRENCH]: 'Transcription...',
+    [Language.ARABIC]: '...جاري النسخ',
+    [Language.FRENCH]: 'Transcription en cours...',
     [Language.SPANISH]: 'Transcribiendo...',
   },
   error: {
     noAudio: {
-        [Language.ENGLISH]: 'Please upload an audio file first.',
-        [Language.HEBREW]: 'אנא העלה קובץ שמע תחילה.',
-        [Language.ARABIC]: 'يرجى تحميل ملف صوتي أولاً.',
-        [Language.FRENCH]: 'Veuillez d\'abord télécharger un fichier audio.',
-        [Language.SPANISH]: 'Por favor, sube un archivo de audio primero.',
-    },
-    tooLarge: {
-        [Language.ENGLISH]: 'Audio file is too large. Please try a smaller file (limit ~4MB).',
-        [Language.HEBREW]: 'קובץ השמע גדול מדי. אנא נסה קובץ קטן יותר (מגבלה של כ-4MB).',
-        [Language.ARABIC]: 'ملف الصوت كبير جدًا. يرجى تجربة ملف أصغر (الحد حوالي 4 ميغابايت).',
-        [Language.FRENCH]: 'Le fichier audio est trop volumineux. Veuillez essayer un fichier plus petit (limite ~4 Mo).',
-        [Language.SPANISH]: 'El archivo de audio es demasiado grande. Por favor, intenta con un archivo más pequeño (límite ~4MB).',
-    },
-    timeout: {
-        [Language.ENGLISH]: 'The request timed out. This can happen with long audio files. Please try a shorter one.',
-        [Language.HEBREW]: 'הבקשה נתקעה (timeout). זה יכול לקרות עם קבצי שמע ארוכים. אנא נסה קובץ קצר יותר.',
-        [Language.ARABIC]: 'انتهت مهلة الطلب. يمكن أن يحدث هذا مع الملفات الصوتية الطويلة. يرجى تجربة ملف أقصر.',
-        [Language.FRENCH]: 'La requête a expiré. Cela peut arriver avec des fichiers audio longs. Veuillez en essayer un plus court.',
-        [Language.SPANISH]: 'La solicitud ha caducado. Esto puede ocurrir con archivos de audio largos. Por favor, intenta con uno más corto.',
-    },
-    unexpected: {
-        [Language.ENGLISH]: 'The server returned an unexpected error.',
-        [Language.HEBREW]: 'השרת החזיר שגיאה לא צפויה.',
-        [Language.ARABIC]: 'أعاد الخادم خطأ غير متوقع.',
-        [Language.FRENCH]: 'Le serveur a retourné une erreur inattendue.',
-        [Language.SPANISH]: 'El servidor devolvió un error inesperado.',
+        [Language.ENGLISH]: 'Please upload or record an audio file first.',
+        [Language.HEBREW]: 'אנא העלה או הקלט קובץ שמע תחילה.',
+        [Language.ARABIC]: 'يرجى تحميل أو تسجيل ملف صوتي أولاً.',
+        [Language.FRENCH]: 'Veuillez d\'abord télécharger ou enregistrer un fichier audio.',
+        [Language.SPANISH]: 'Por favor, sube o graba un archivo de audio primero.',
     },
     unknown: {
         [Language.ENGLISH]: 'An unknown error occurred.',
@@ -67,7 +46,7 @@ const translations = {
   footer: {
     [Language.ENGLISH]: 'Powered by Gemini',
     [Language.HEBREW]: 'מופעל באמצעות Gemini',
-    [Language.ARABIC]: 'مدعوم بواسطة Gemini',
+    [Language.ARABIC]: 'بدعم من Gemini',
     [Language.FRENCH]: 'Propulsé par Gemini',
     [Language.SPANISH]: 'Desarrollado por Gemini',
   }
@@ -88,8 +67,8 @@ const App: React.FC = () => {
     
     const title: Record<Language, string> = {
         [Language.ENGLISH]: "Audio Transcriber",
-        [Language.HEBREW]: "תמי ליל - מתמלל אודיו",
-        [Language.ARABIC]: "مُفرّغ صوتي",
+        [Language.HEBREW]: "מתמלל אודיו",
+        [Language.ARABIC]: "منسخ الصوت",
         [Language.FRENCH]: "Transcripteur Audio",
         [Language.SPANISH]: "Transcriptor de Audio",
     };
@@ -108,35 +87,8 @@ const App: React.FC = () => {
     setTranscription('');
 
     try {
-      const base64Audio = await fileToBase64(audioData.data);
-      const mimeType = audioData.data.type || 'audio/webm';
-
-      const apiResponse = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          base64Audio,
-          mimeType,
-          language,
-        }),
-      });
-
-      if (!apiResponse.ok) {
-        if (apiResponse.status === 413) {
-            throw new Error(translations.error.tooLarge[language]);
-        }
-        if (apiResponse.status === 504) {
-            throw new Error(translations.error.timeout[language]);
-        }
-        
-        const errorData = await apiResponse.json().catch(() => null);
-        throw new Error(errorData?.error || translations.error.unexpected[language]);
-      }
-
-      const result = await apiResponse.json();
-      setTranscription(result.transcription);
+      const result = await transcribeAudio(audioData, language);
+      setTranscription(result);
 
     } catch (err) {
       console.error(err);

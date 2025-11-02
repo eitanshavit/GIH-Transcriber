@@ -19,7 +19,7 @@ const placeholders: Record<Language, string> = {
 const titles: Record<Language, string> = {
     [Language.ENGLISH]: "Transcription",
     [Language.HEBREW]: "תמלול",
-    [Language.ARABIC]: "التفريغ النصي",
+    [Language.ARABIC]: "النسخ",
     [Language.FRENCH]: "Transcription",
     [Language.SPANISH]: "Transcripción",
 };
