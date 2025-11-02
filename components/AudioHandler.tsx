@@ -1,21 +1,34 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { UploadIcon, MicIcon, StopIcon, TrashIcon } from './icons';
+import { MicIcon, StopIcon, TrashIcon } from './icons';
 import { Language } from '../types';
 import { useRecorder } from '../hooks/useRecorder';
 
+// FIX: Add type declarations for Google API scripts loaded externally.
+declare global {
+  interface Window {
+    gapi: any;
+    google: any;
+  }
+}
+
+// A placeholder for your Google Cloud project's client ID
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'YOUR_GOOGLE_API_KEY';
+
 interface AudioHandlerProps {
   onAudioReady: (audio: { data: File | Blob; url: string } | null) => void;
+  onDriveFileReady: (file: { id: string; name: string; accessToken: string} | null) => void;
   isTranscribing: boolean;
   language: Language;
 }
 
 const translations: Record<string, Record<Language, string>> = {
-  uploadFile: {
-    [Language.ENGLISH]: 'Upload File',
-    [Language.HEBREW]: 'העלאת קובץ',
-    [Language.ARABIC]: 'تحميل ملف',
-    [Language.FRENCH]: 'Télécharger un fichier',
-    [Language.SPANISH]: 'Subir archivo',
+  drive: {
+    [Language.ENGLISH]: 'Google Drive',
+    [Language.HEBREW]: 'גוגל דרייב',
+    [Language.ARABIC]: 'جوجل درايف',
+    [Language.FRENCH]: 'Google Drive',
+    [Language.SPANISH]: 'Google Drive',
   },
   recordAudio: {
     [Language.ENGLISH]: 'Record Audio',
@@ -24,26 +37,19 @@ const translations: Record<string, Record<Language, string>> = {
     [Language.FRENCH]: 'Enregistrer l\'audio',
     [Language.SPANISH]: 'Grabar audio',
   },
-  clickToUpload: {
-    [Language.ENGLISH]: 'Click to upload',
-    [Language.HEBREW]: 'לחץ להעלאה',
-    [Language.ARABIC]: 'انقر للتحميل',
-    [Language.FRENCH]: 'Cliquez pour télécharger',
-    [Language.SPANISH]: 'Haz clic para subir',
+  connectDrive: {
+    [Language.ENGLISH]: 'Connect Google Drive',
+    [Language.HEBREW]: 'התחבר לגוגל דרייב',
+    [Language.ARABIC]: 'ربط جوجل درايف',
+    [Language.FRENCH]: 'Connecter Google Drive',
+    [Language.SPANISH]: 'Conectar Google Drive',
   },
-  dragAndDrop: {
-    [Language.ENGLISH]: 'or drag and drop',
-    [Language.HEBREW]: 'או גרור קובץ לכאן',
-    [Language.ARABIC]: 'أو قم بالسحب والإفلات',
-    [Language.FRENCH]: 'ou glissez-déposez',
-    [Language.SPANISH]: 'o arrastra y suelta',
-  },
-  supportedFiles: {
-    [Language.ENGLISH]: 'Supported audio files (MP3, WAV, etc.)',
-    [Language.HEBREW]: "קבצי שמע נתמכים (MP3, WAV, וכו')",
-    [Language.ARABIC]: 'ملفات صوتية مدعومة (MP3, WAV, etc.)',
-    [Language.FRENCH]: 'Fichiers audio pris en charge (MP3, WAV, etc.)',
-    [Language.SPANISH]: 'Archivos de audio compatibles (MP3, WAV, etc.)',
+  selectFile: {
+    [Language.ENGLISH]: 'Select File from Drive',
+    [Language.HEBREW]: 'בחר קובץ מדרייב',
+    [Language.ARABIC]: 'حدد ملفًا من Drive',
+    [Language.FRENCH]: 'Sélectionner un fichier depuis Drive',
+    [Language.SPANISH]: 'Seleccionar archivo de Drive',
   },
   startRecording: {
     [Language.ENGLISH]: 'Start Recording',
@@ -82,33 +88,91 @@ const translations: Record<string, Record<Language, string>> = {
     },
 };
 
-export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, isTranscribing, language }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'record'>('upload');
+export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriveFileReady, isTranscribing, language }) => {
+  const [activeTab, setActiveTab] = useState<'drive' | 'record'>('drive');
   const memoizedOnAudioReady = useCallback(onAudioReady, []);
   
-  // --- File Upload State & Logic ---
-  const [uploadedFile, setUploadedFile] = useState<{ data: File, url: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // --- Google Drive State ---
+  const [gapiLoaded, setGapiLoaded] = useState(false);
+  const [gisLoaded, setGisLoaded] = useState(false);
+  const [tokenClient, setTokenClient] = useState<any>(null);
+  const [gdriveFile, setGdriveFile] = useState<{ id: string; name: string; accessToken: string} | null>(null);
+  const pickerInited = useRef(false);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    handleClearRecording(); // Clear any existing recording
-    const file = event.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setUploadedFile({ data: file, url });
-      memoizedOnAudioReady({ data: file, url });
-    } else {
-      setUploadedFile(null);
-      memoizedOnAudioReady(null);
+  // --- Load Google Scripts ---
+  useEffect(() => {
+    const scriptGapi = document.createElement('script');
+    scriptGapi.src = 'https://apis.google.com/js/api.js';
+    scriptGapi.async = true;
+    scriptGapi.defer = true;
+    scriptGapi.onload = () => window.gapi.load('client:picker', () => setGapiLoaded(true));
+    document.body.appendChild(scriptGapi);
+
+    const scriptGis = document.createElement('script');
+    scriptGis.src = 'https://accounts.google.com/gsi/client';
+    scriptGis.async = true;
+    scriptGis.defer = true;
+    scriptGis.onload = () => setGisLoaded(true);
+    document.body.appendChild(scriptGis);
+
+    return () => {
+        document.body.removeChild(scriptGapi);
+        document.body.removeChild(scriptGis);
     }
+  }, []);
+
+  // --- Initialize Google Auth Client ---
+  useEffect(() => {
+      if (gisLoaded) {
+          const client = window.google.accounts.oauth2.initTokenClient({
+              client_id: GOOGLE_CLIENT_ID,
+              scope: 'https://www.googleapis.com/auth/drive.readonly',
+              callback: (tokenResponse: any) => {
+                  if (tokenResponse.error) {
+                      console.error('Google Auth Error:', tokenResponse.error);
+                      return;
+                  }
+                  showPicker(tokenResponse.access_token);
+              },
+          });
+          setTokenClient(client);
+      }
+  }, [gisLoaded]);
+
+  const handleAuthClick = () => {
+      if (tokenClient) {
+          tokenClient.requestAccessToken();
+      } else {
+          console.error("Google Auth Client not initialized.");
+      }
+  };
+  
+  const showPicker = (accessToken: string) => {
+      if (gapiLoaded && !pickerInited.current) {
+          const view = new window.google.picker.View(window.google.picker.ViewId.DOCS);
+          view.setMimeTypes("audio/mpeg,audio/wav,audio/x-wav,audio/mp3,audio/webm,audio/flac,audio/ogg,audio/aac");
+          const picker = new window.google.picker.PickerBuilder()
+              .setAppId(null) // Not needed for OAuth 2.0
+              .setOAuthToken(accessToken)
+              .addView(view)
+              .setDeveloperKey(GOOGLE_API_KEY)
+              .setCallback((data: any) => {
+                  if (data[window.google.picker.Response.ACTION] == window.google.picker.Action.PICKED) {
+                      const doc = data[window.google.picker.Response.DOCUMENTS][0];
+                      const file = { id: doc.id, name: doc.name, accessToken: accessToken };
+                      setGdriveFile(file);
+                      onDriveFileReady(file);
+                      memoizedOnAudioReady(null);
+                  }
+              })
+              .build();
+          picker.setVisible(true);
+          pickerInited.current = true;
+          // Reset after a short delay to allow picker to be created again
+          setTimeout(() => { pickerInited.current = false; }, 1000);
+      }
   };
 
-  useEffect(() => {
-    const currentUrl = uploadedFile?.url;
-    return () => {
-      if (currentUrl) URL.revokeObjectURL(currentUrl);
-    };
-  }, [uploadedFile]);
 
   // --- Recorder State & Logic ---
   const { isRecording, audioBlob, startRecording, stopRecording, resetRecording } = useRecorder();
@@ -122,15 +186,10 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, isTran
       const newAudio = { data: audioBlob, url };
       setRecordedAudio(newAudio);
       memoizedOnAudioReady(newAudio);
+      onDriveFileReady(null);
+      setGdriveFile(null);
     }
-  }, [audioBlob, memoizedOnAudioReady]);
-
-  useEffect(() => {
-    const currentUrl = recordedAudio?.url;
-    return () => {
-      if (currentUrl) URL.revokeObjectURL(currentUrl);
-    };
-  }, [recordedAudio]);
+  }, [audioBlob, memoizedOnAudioReady, onDriveFileReady]);
 
   useEffect(() => {
     if (isRecording) {
@@ -148,14 +207,13 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, isTran
   }, [isRecording]);
 
   const handleStartRecording = () => {
-    // Clear file input state
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    setUploadedFile(null);
-    handleClearRecording(); // Clear previous recording if any
+    setGdriveFile(null);
+    onDriveFileReady(null);
+    handleClearRecording();
     memoizedOnAudioReady(null);
     startRecording();
   };
-
+  
   const handleClearRecording = () => {
     resetRecording();
     setRecordedAudio(null);
@@ -168,17 +226,15 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, isTran
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const uploadedFileName = uploadedFile ? fileInputRef.current?.files?.[0]?.name : null;
-
   return (
     <div className="w-full bg-gray-800 rounded-lg p-4 sm:p-6 mt-6">
       <div className="flex border-b border-gray-700 mb-4">
         <button
-          onClick={() => setActiveTab('upload')}
+          onClick={() => setActiveTab('drive')}
           disabled={isTranscribing}
-          className={`px-4 py-2 font-medium transition-colors disabled:opacity-50 ${activeTab === 'upload' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
+          className={`px-4 py-2 font-medium transition-colors disabled:opacity-50 ${activeTab === 'drive' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
         >
-          {translations.uploadFile[language]}
+          {translations.drive[language]}
         </button>
         <button
           onClick={() => setActiveTab('record')}
@@ -189,35 +245,31 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, isTran
         </button>
       </div>
 
-      {activeTab === 'upload' && (
-        <div>
-          <div 
-            className="flex flex-col items-center justify-center border-2 border-dashed border-gray-600 rounded-lg p-8 cursor-pointer hover:border-indigo-500 hover:bg-gray-700/50 transition-colors"
-            onClick={() => !isTranscribing && fileInputRef.current?.click()}
-          >
-            <UploadIcon className="w-12 h-12 text-gray-500 mb-2" />
-            <p className="text-gray-400">
-              <span className="font-semibold text-indigo-400">{translations.clickToUpload[language]}</span> {translations.dragAndDrop[language]}
-            </p>
-            <p className="text-xs text-gray-500">{translations.supportedFiles[language]}</p>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="audio/*"
-              className="hidden"
-              disabled={isTranscribing}
-            />
-          </div>
-
-          {uploadedFile && (
-            <div className="mt-4 p-4 bg-gray-900/50 rounded-lg">
-              <p className="text-sm font-medium text-gray-300 mb-2 truncate" dir="ltr">
-                {uploadedFileName}
-              </p>
-              <audio controls src={uploadedFile.url} className="w-full" />
-            </div>
-          )}
+      {activeTab === 'drive' && (
+        <div className="flex flex-col items-center justify-center p-4">
+            {!gdriveFile && (
+                <button
+                onClick={handleAuthClick}
+                disabled={isTranscribing || !gapiLoaded || !gisLoaded || !tokenClient}
+                className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
+              >
+                  { gapiLoaded && gisLoaded ? translations.connectDrive[language] : 'Loading...' }
+              </button>
+            )}
+            {gdriveFile && (
+                 <div className="w-full mt-4 p-4 bg-gray-900/50 rounded-lg text-center">
+                    <p className="text-sm font-medium text-gray-300 mb-2 truncate" dir="ltr">
+                        Selected: {gdriveFile.name}
+                    </p>
+                    <button
+                        onClick={handleAuthClick}
+                        disabled={isTranscribing || !gapiLoaded || !gisLoaded || !tokenClient}
+                        className="text-indigo-400 hover:text-indigo-300 text-sm"
+                    >
+                        Choose another file
+                    </button>
+                </div>
+            )}
         </div>
       )}
 
