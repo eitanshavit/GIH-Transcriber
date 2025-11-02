@@ -20,6 +20,13 @@ const translations = {
     [Language.FRENCH]: 'Transcription en cours...',
     [Language.SPANISH]: 'Transcribiendo...',
   },
+  progress: {
+    [Language.ENGLISH]: 'Processing chunk {processed} of {total}',
+    [Language.HEBREW]: 'מעבד חלק {processed} מתוך {total}',
+    [Language.ARABIC]: 'جاري معالجة الجزء {processed} من {total}',
+    [Language.FRENCH]: 'Traitement du segment {processed} sur {total}',
+    [Language.SPANISH]: 'Procesando fragmento {processed} de {total}',
+  },
   error: {
     noAudio: {
         [Language.ENGLISH]: 'Please upload or record an audio file first.',
@@ -59,6 +66,8 @@ const App: React.FC = () => {
   const [transcription, setTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
+
 
   useEffect(() => {
     const isRtl = language === Language.HEBREW || language === Language.ARABIC;
@@ -85,9 +94,10 @@ const App: React.FC = () => {
     setIsTranscribing(true);
     setError(null);
     setTranscription('');
+    setProgress(null);
 
     try {
-      const result = await transcribeAudio(audioData, language);
+      const result = await transcribeAudio(audioData, language, setProgress);
       setTranscription(result);
 
     } catch (err) {
@@ -97,6 +107,7 @@ const App: React.FC = () => {
       setTranscription('');
     } finally {
       setIsTranscribing(false);
+      setProgress(null);
     }
   }, [audioData, language]);
 
@@ -111,15 +122,32 @@ const App: React.FC = () => {
           <button
             onClick={handleTranscribe}
             disabled={!audioData || isTranscribing}
-            className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500"
+            className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 min-h-[52px] w-64 flex items-center justify-center"
           >
             {isTranscribing ? (
-              <div className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-3 rtl:ml-3 rtl:-mr-1 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {translations.transcribing[language]}
+              <div className="flex flex-col items-center w-full">
+                <div className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 rtl:ml-3 rtl:-mr-1 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {translations.transcribing[language]}
+                </div>
+                {progress && progress.total > 1 && (
+                    <div className="w-full mt-2">
+                        <div className="w-full bg-gray-700/50 rounded-full h-1.5">
+                            <div 
+                            className="bg-indigo-400 h-1.5 rounded-full transition-all duration-300" 
+                            style={{ width: `${(progress.processed / progress.total) * 100}%` }}>
+                            </div>
+                        </div>
+                        <p className="text-xs text-indigo-200 mt-1 text-center">
+                         {translations.progress[language]
+                            .replace('{processed}', String(progress.processed))
+                            .replace('{total}', String(progress.total))}
+                        </p>
+                    </div>
+                )}
               </div>
             ) : translations.transcribeFile[language]}
           </button>

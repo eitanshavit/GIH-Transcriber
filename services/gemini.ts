@@ -1,12 +1,12 @@
 import { Language } from '../types';
 import { fileToBase64 } from '../utils/file';
 
-export const transcribeAudio = async (
-    audioData: { data: File | Blob; url: string }, 
-    language: Language
+const transcribeChunk = async (
+    chunk: Blob,
+    language: Language,
+    mimeType: string
 ): Promise<string> => {
-    const base64Audio = await fileToBase64(audioData.data);
-    const mimeType = audioData.data.type || 'audio/webm';
+    const base64Audio = await fileToBase64(chunk);
 
     const response = await fetch('/api/transcribe', {
         method: 'POST',
@@ -21,23 +21,48 @@ export const transcribeAudio = async (
     });
 
     if (!response.ok) {
-        // If the response is not OK, the body might not be JSON.
-        // We try to get the error message from the body as text.
-        // Vercel's "Request Entity Too Large" error is plain text/html.
         const errorText = await response.text();
-        
-        // Try to parse as JSON in case the server did send a JSON error
         try {
             const errorJson = JSON.parse(errorText);
             throw new Error(errorJson.error || `API Error: ${response.status}`);
         } catch (e) {
-            // If parsing fails, it's not JSON, so use the raw text.
-            // This will now correctly show "Request Entity Too Large".
             throw new Error(errorText || `API Error: ${response.status}`);
         }
     }
 
-    // If response.ok is true, we can safely assume the body is JSON.
     const result = await response.json();
     return result.transcription;
+};
+
+
+export const transcribeAudio = async (
+    audioData: { data: File | Blob; url: string }, 
+    language: Language,
+    onProgress: (progress: { processed: number; total: number }) => void
+): Promise<string> => {
+    const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB
+    const audioBlob = audioData.data;
+    const totalChunks = Math.ceil(audioBlob.size / CHUNK_SIZE);
+
+    onProgress({ processed: 0, total: totalChunks });
+
+    if (totalChunks === 0) {
+        return "";
+    }
+
+    const transcriptions: string[] = [];
+    for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, audioBlob.size);
+        const chunk = audioBlob.slice(start, end);
+        
+        const mimeType = audioData.data.type || 'audio/webm';
+
+        const transcriptionPart = await transcribeChunk(chunk, language, mimeType);
+        transcriptions.push(transcriptionPart);
+        
+        onProgress({ processed: i + 1, total: totalChunks });
+    }
+
+    return transcriptions.join(' ');
 };
