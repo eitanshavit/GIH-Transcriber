@@ -7,12 +7,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  // Log the authorization event to the server console for basic tracking.
-  console.log("[Auth Notification] A user has authorized the application. Triggering notification process.");
+  const userInfo = req.body;
+
+  // Log the authorization event with user details for better tracking.
+  console.log(`[Auth Notification] User authorized: ${userInfo?.name || 'Unknown'} (${userInfo?.email || 'No email'}). Triggering notification.`);
   
   try {
     console.log("[Auth Notification] Attempting to send authorization email...");
-    const emailResult = await sendAuthorizationEmail();
+    const emailResult = await sendAuthorizationEmail(userInfo);
     
     if (emailResult.success) {
       console.log("[Auth Notification] Email notification dispatched successfully.");

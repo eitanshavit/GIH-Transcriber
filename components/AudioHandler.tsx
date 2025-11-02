@@ -128,10 +128,22 @@ const translations: Record<string, Record<Language, string>> = {
     },
 };
 
-const notifyServerOfAuthorization = () => {
+interface UserInfo {
+  name: string;
+  email: string;
+  picture?: string;
+}
+
+const notifyServerOfAuthorization = (userInfo: UserInfo) => {
   // Fire-and-forget a request to the backend to log the authorization event.
-  fetch('/api/notify-auth', { method: 'POST' })
-    .catch(error => console.error("Could not send authorization notification:", error));
+  fetch('/api/notify-auth', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(userInfo),
+  })
+  .catch(error => console.error("Could not send authorization notification:", error));
 };
 
 export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriveFileReady, isTranscribing, language, isInIframe, onError }) => {
@@ -149,6 +161,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
 
   // --- State for iframe communication ---
   const [parentAccessToken, setParentAccessToken] = useState<string | null>(null);
+  const parentAccessTokenRef = useRef<string | null>(null);
   const [parentApiKey, setParentApiKey] = useState<string | null>(null);
 
   // --- State for local file upload ---
@@ -226,20 +239,32 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   // --- Listen for token from parent window when in iframe ---
   useEffect(() => {
     if (isInIframe) {
-      const handleMessage = (event: MessageEvent) => {
+      const handleMessage = async (event: MessageEvent) => {
         // NOTE: In a production app, you should add a security check for event.origin here
         // to ensure the message is from a trusted parent domain.
         if (event.data?.type === 'googleAuthToken' && event.data.token) {
-          // Only update and notify if the token is new
-          setParentAccessToken(currentToken => {
-            if (currentToken !== event.data.token) {
-              notifyServerOfAuthorization();
-              return event.data.token;
+          const newAccessToken = event.data.token;
+          
+          if (parentAccessTokenRef.current !== newAccessToken) {
+            parentAccessTokenRef.current = newAccessToken;
+
+            setParentAccessToken(newAccessToken);
+            setParentApiKey(event.data.apiKey);
+            setConfigError(null);
+
+            // Fetch user info and notify
+            try {
+              const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { 'Authorization': `Bearer ${newAccessToken}` }
+              });
+              if (!userInfoResponse.ok) throw new Error('Failed to fetch user info');
+              const userInfo = await userInfoResponse.json();
+              notifyServerOfAuthorization({ name: userInfo.name, email: userInfo.email, picture: userInfo.picture });
+            } catch (error) {
+              console.error("Error fetching user info for notification (iframe):", error);
+              notifyServerOfAuthorization({ name: 'Unknown User (iframe)', email: 'Not available' });
             }
-            return currentToken;
-          });
-          setParentApiKey(event.data.apiKey); // Expect apiKey from parent as well
-          setConfigError(null);
+          }
         }
       };
       
@@ -283,15 +308,29 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
           try {
             const client = window.google.accounts.oauth2.initTokenClient({
                 client_id: googleConfig.clientId,
-                scope: 'https://www.googleapis.com/auth/drive.readonly',
-                callback: (tokenResponse: any) => {
+                scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                callback: async (tokenResponse: any) => {
                     if (tokenResponse.error) {
                         console.error('Google Auth Error:', tokenResponse);
                         setConfigError(`Authentication failed: ${tokenResponse.error_description || tokenResponse.error}. Please ensure the Google Cloud configuration is correct.`);
                         return;
                     }
                     setConfigError(null);
-                    notifyServerOfAuthorization(); // Send notification on successful auth
+
+                    // Fetch user info and send notification
+                    try {
+                      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                          headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
+                      });
+                      if (!userInfoResponse.ok) throw new Error('Failed to fetch user info');
+                      const userInfo = await userInfoResponse.json();
+                      notifyServerOfAuthorization({ name: userInfo.name, email: userInfo.email, picture: userInfo.picture });
+                    } catch (error) {
+                        console.error("Error fetching user info for notification:", error);
+                        // Send notification with partial info as a fallback
+                        notifyServerOfAuthorization({ name: 'Unknown User', email: 'Not available' });
+                    }
+                    
                     showPicker(tokenResponse.access_token);
                 },
             });

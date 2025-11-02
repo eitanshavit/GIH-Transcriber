@@ -1,5 +1,11 @@
 // services/email.ts
 
+interface UserInfo {
+  name: string;
+  email: string;
+  picture?: string;
+}
+
 interface EmailPayload {
   to: string;
   from: string;
@@ -7,7 +13,7 @@ interface EmailPayload {
   html: string;
 }
 
-export const sendAuthorizationEmail = async (): Promise<{ success: boolean; error?: string }> => {
+export const sendAuthorizationEmail = async (userInfo: UserInfo): Promise<{ success: boolean; error?: string }> => {
   const apiKey = process.env.RESEND_API_KEY;
   const to = process.env.NOTIFICATION_EMAIL_TO;
   const from = process.env.NOTIFICATION_EMAIL_FROM;
@@ -23,13 +29,22 @@ export const sendAuthorizationEmail = async (): Promise<{ success: boolean; erro
   const payload: EmailPayload = {
     from,
     to,
-    subject: 'New User Authorization on Audio Transcriber',
+    subject: `New User Auth: ${userInfo.name || 'Unknown User'}`,
     html: `
-      <div style="font-family: sans-serif; padding: 20px; color: #333;">
-        <h1 style="color: #4F46E5;">Authorization Alert</h1>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px;">
+        <h1 style="color: #4F46E5; border-bottom: 2px solid #4F46E5; padding-bottom: 10px;">Authorization Alert</h1>
         <p>A user has successfully connected their Google Account to the <strong>Audio Transcriber</strong> application.</p>
-        <p>This is an automated notification. No action is required.</p>
-        <hr style="border: none; border-top: 1px solid #eee;" />
+        
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-top: 20px; display: flex; align-items: center; gap: 15px;">
+          ${userInfo.picture ? `<img src="${userInfo.picture}" alt="User avatar" style="width: 50px; height: 50px; border-radius: 50%;" />` : ''}
+          <div>
+            <strong style="display: block; font-size: 16px;">${userInfo.name || 'Unknown Name'}</strong>
+            <a href="mailto:${userInfo.email}" style="color: #555; text-decoration: none;">${userInfo.email || 'No email provided'}</a>
+          </div>
+        </div>
+
+        <p style="margin-top: 20px;">This is an automated notification. No action is required.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
         <p style="font-size: 12px; color: #777;">Timestamp: ${new Date().toUTCString()}</p>
       </div>
     `,
