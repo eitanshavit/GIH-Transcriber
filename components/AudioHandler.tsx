@@ -11,10 +11,6 @@ declare global {
   }
 }
 
-// A placeholder for your Google Cloud project's client ID
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'YOUR_GOOGLE_API_KEY';
-
 interface AudioHandlerProps {
   onAudioReady: (audio: { data: File | Blob; url: string } | null) => void;
   onDriveFileReady: (file: { id: string; name: string; accessToken: string} | null) => void;
@@ -38,18 +34,11 @@ const translations: Record<string, Record<Language, string>> = {
     [Language.SPANISH]: 'Grabar audio',
   },
   connectDrive: {
-    [Language.ENGLISH]: 'Connect Google Drive',
-    [Language.HEBREW]: 'התחבר לגוגל דרייב',
-    [Language.ARABIC]: 'ربط جوجل درايف',
-    [Language.FRENCH]: 'Connecter Google Drive',
-    [Language.SPANISH]: 'Conectar Google Drive',
-  },
-  selectFile: {
-    [Language.ENGLISH]: 'Select File from Drive',
-    [Language.HEBREW]: 'בחר קובץ מדרייב',
-    [Language.ARABIC]: 'حدد ملفًا من Drive',
-    [Language.FRENCH]: 'Sélectionner un fichier depuis Drive',
-    [Language.SPANISH]: 'Seleccionar archivo de Drive',
+    [Language.ENGLISH]: 'Connect & Select File',
+    [Language.HEBREW]: 'התחבר ובחר קובץ',
+    [Language.ARABIC]: 'اتصل واختر ملفًا',
+    [Language.FRENCH]: 'Connecter et sélectionner',
+    [Language.SPANISH]: 'Conectar y Seleccionar',
   },
   startRecording: {
     [Language.ENGLISH]: 'Start Recording',
@@ -93,70 +82,63 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   const memoizedOnAudioReady = useCallback(onAudioReady, []);
   
   // --- Google Drive State ---
+  const [clientId, setClientId] = useState(() => localStorage.getItem('googleClientId') || '');
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('googleApiKey') || '');
+  const [configError, setConfigError] = useState<string | null>(null);
+
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [gisLoaded, setGisLoaded] = useState(false);
   const [tokenClient, setTokenClient] = useState<any>(null);
   const [gdriveFile, setGdriveFile] = useState<{ id: string; name: string; accessToken: string} | null>(null);
   const pickerInited = useRef(false);
 
+  // --- Persist keys to localStorage ---
+  useEffect(() => {
+    localStorage.setItem('googleClientId', clientId);
+  }, [clientId]);
+  useEffect(() => {
+    localStorage.setItem('googleApiKey', apiKey);
+  }, [apiKey]);
+
+
   // --- Load Google Scripts ---
   useEffect(() => {
-    const scriptGapi = document.createElement('script');
-    scriptGapi.src = 'https://apis.google.com/js/api.js';
-    scriptGapi.async = true;
-    scriptGapi.defer = true;
-    scriptGapi.onload = () => window.gapi.load('client:picker', () => setGapiLoaded(true));
-    document.body.appendChild(scriptGapi);
+    // gapi is loaded from index.html, we just need to load the modules we need
+    if (window.gapi) {
+        window.gapi.load('client:picker', () => {
+            setGapiLoaded(true);
+        });
+    }
 
     const scriptGis = document.createElement('script');
     scriptGis.src = 'https://accounts.google.com/gsi/client';
     scriptGis.async = true;
     scriptGis.defer = true;
-    scriptGis.onload = () => setGisLoaded(true);
+    scriptGis.onload = () => {
+        setGisLoaded(true);
+    };
     document.body.appendChild(scriptGis);
 
     return () => {
-        document.body.removeChild(scriptGapi);
-        document.body.removeChild(scriptGis);
+        const script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+        if (script) {
+            document.body.removeChild(script);
+        }
     }
   }, []);
 
   // --- Initialize Google Auth Client ---
-  useEffect(() => {
-      if (gisLoaded) {
-          const client = window.google.accounts.oauth2.initTokenClient({
-              client_id: GOOGLE_CLIENT_ID,
-              scope: 'https://www.googleapis.com/auth/drive.readonly',
-              callback: (tokenResponse: any) => {
-                  if (tokenResponse.error) {
-                      console.error('Google Auth Error:', tokenResponse.error);
-                      return;
-                  }
-                  showPicker(tokenResponse.access_token);
-              },
-          });
-          setTokenClient(client);
-      }
-  }, [gisLoaded]);
-
-  const handleAuthClick = () => {
-      if (tokenClient) {
-          tokenClient.requestAccessToken();
-      } else {
-          console.error("Google Auth Client not initialized.");
-      }
-  };
-  
-  const showPicker = (accessToken: string) => {
-      if (gapiLoaded && !pickerInited.current) {
+  const showPicker = useCallback((accessToken: string) => {
+      if (gapiLoaded && !pickerInited.current && apiKey) {
           const view = new window.google.picker.View(window.google.picker.ViewId.DOCS);
           view.setMimeTypes("audio/mpeg,audio/wav,audio/x-wav,audio/mp3,audio/webm,audio/flac,audio/ogg,audio/aac");
           const picker = new window.google.picker.PickerBuilder()
-              .setAppId(null) // Not needed for OAuth 2.0
+              .setAppId(null)
               .setOAuthToken(accessToken)
               .addView(view)
-              .setDeveloperKey(GOOGLE_API_KEY)
+              .setDeveloperKey(apiKey)
               .setCallback((data: any) => {
+                  pickerInited.current = false; // Reset for next time
                   if (data[window.google.picker.Response.ACTION] == window.google.picker.Action.PICKED) {
                       const doc = data[window.google.picker.Response.DOCUMENTS][0];
                       const file = { id: doc.id, name: doc.name, accessToken: accessToken };
@@ -168,12 +150,46 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
               .build();
           picker.setVisible(true);
           pickerInited.current = true;
-          // Reset after a short delay to allow picker to be created again
-          setTimeout(() => { pickerInited.current = false; }, 1000);
+      }
+  }, [gapiLoaded, apiKey, onDriveFileReady, memoizedOnAudioReady]);
+
+  useEffect(() => {
+      if (gisLoaded && clientId) {
+          try {
+            const client = window.google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: 'https://www.googleapis.com/auth/drive.readonly',
+                callback: (tokenResponse: any) => {
+                    if (tokenResponse.error) {
+                        console.error('Google Auth Error:', tokenResponse);
+                        setConfigError(`Authentication failed: ${tokenResponse.error_description || tokenResponse.error}. Please check your Client ID configuration.`);
+                        return;
+                    }
+                    setConfigError(null);
+                    showPicker(tokenResponse.access_token);
+                },
+            });
+            setTokenClient(client);
+          } catch(err) {
+              console.error("Error initializing Google Auth Client:", err);
+              setConfigError('Invalid Client ID. Please ensure it is correct and try again.');
+              setTokenClient(null);
+          }
+      } else {
+          setTokenClient(null);
+      }
+  }, [gisLoaded, clientId, showPicker]);
+
+
+  const handleAuthClick = () => {
+      setConfigError(null);
+      if (tokenClient) {
+          tokenClient.requestAccessToken({prompt: 'select_account'});
+      } else {
+          setConfigError("Google Auth Client not ready. Please check your Client ID.");
       }
   };
-
-
+  
   // --- Recorder State & Logic ---
   const { isRecording, audioBlob, startRecording, stopRecording, resetRecording } = useRecorder();
   const [recordedAudio, setRecordedAudio] = useState<{ data: Blob, url: string } | null>(null);
@@ -226,6 +242,8 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const areApisReady = gapiLoaded && gisLoaded;
+
   return (
     <div className="w-full bg-gray-800 rounded-lg p-4 sm:p-6 mt-6">
       <div className="flex border-b border-gray-700 mb-4">
@@ -246,29 +264,57 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
       </div>
 
       {activeTab === 'drive' && (
-        <div className="flex flex-col items-center justify-center p-4">
-            {!gdriveFile && (
-                <button
-                onClick={handleAuthClick}
-                disabled={isTranscribing || !gapiLoaded || !gisLoaded || !tokenClient}
-                className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
-              >
-                  { gapiLoaded && gisLoaded ? translations.connectDrive[language] : 'Loading...' }
-              </button>
-            )}
-            {gdriveFile && (
+        <div className="flex flex-col items-center justify-center p-4 space-y-4">
+            <div className="w-full p-4 bg-gray-900/50 rounded-lg text-sm text-gray-300 space-y-3">
+                <p>To use Google Drive, you need to provide your own Google Cloud credentials.</p>
+                <ol className="list-decimal list-inside space-y-2 text-xs">
+                    <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Google Cloud Console</a>.</li>
+                    <li>Enable the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> for your project.</li>
+                    <li>Create an <strong>API Key</strong> and an <strong>OAuth 2.0 Client ID</strong> (for Web Application).</li>
+                    <li>For the OAuth Client ID, add your app's URL (e.g., `https://your-app-url.com`) to the "Authorized JavaScript origins".</li>
+                </ol>
+                <p className="text-xs text-gray-400">This information is stored only in your browser's local storage.</p>
+            </div>
+
+            <div className="w-full space-y-3">
+                <input
+                    type="text"
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    placeholder="Enter your Google Client ID"
+                    className="w-full bg-gray-900 rounded-md p-3 text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="Enter your Google API Key"
+                    className="w-full bg-gray-900 rounded-md p-3 text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+            </div>
+            {configError && <p className="text-sm text-red-400">{configError}</p>}
+            
+            {gdriveFile ? (
                  <div className="w-full mt-4 p-4 bg-gray-900/50 rounded-lg text-center">
                     <p className="text-sm font-medium text-gray-300 mb-2 truncate" dir="ltr">
                         Selected: {gdriveFile.name}
                     </p>
                     <button
                         onClick={handleAuthClick}
-                        disabled={isTranscribing || !gapiLoaded || !gisLoaded || !tokenClient}
-                        className="text-indigo-400 hover:text-indigo-300 text-sm"
+                        disabled={isTranscribing || !areApisReady || !tokenClient || !clientId || !apiKey}
+                        className="text-indigo-400 hover:text-indigo-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Choose another file
                     </button>
                 </div>
+            ) : (
+                <button
+                onClick={handleAuthClick}
+                disabled={isTranscribing || !areApisReady || !tokenClient || !clientId || !apiKey}
+                className="flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
+              >
+                  { !areApisReady ? 'Loading APIs...' : translations.connectDrive[language] }
+              </button>
             )}
         </div>
       )}
