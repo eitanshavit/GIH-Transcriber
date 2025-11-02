@@ -240,6 +240,7 @@ const App: React.FC = () => {
             isTranscribing={isTranscribing} 
             language={language}
             isInIframe={isInIframe}
+            onError={setError}
              />
         
         {isPreviewLoading && (

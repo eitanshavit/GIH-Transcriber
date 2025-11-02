@@ -17,6 +17,7 @@ interface AudioHandlerProps {
   isTranscribing: boolean;
   language: Language;
   isInIframe: boolean;
+  onError: (message: string | null) => void;
 }
 
 const translations: Record<string, Record<Language, string>> = {
@@ -133,7 +134,7 @@ const notifyServerOfAuthorization = () => {
     .catch(error => console.error("Could not send authorization notification:", error));
 };
 
-export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriveFileReady, isTranscribing, language, isInIframe }) => {
+export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriveFileReady, isTranscribing, language, isInIframe, onError }) => {
   const [activeTab, setActiveTab] = useState<'drive' | 'record' | 'upload'>('drive');
   
   // --- Google Drive State ---
@@ -152,7 +153,6 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
 
   // --- State for local file upload ---
   const [localFile, setLocalFile] = useState<File | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Recorder State & Logic ---
@@ -166,11 +166,11 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   const handleClearLocalFile = useCallback(() => {
     setLocalFile(null);
     onAudioReady(null);
-    setUploadError(null);
+    onError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [onAudioReady]);
+  }, [onAudioReady, onError]);
   
   const handleClearRecording = useCallback(() => {
     resetRecording();
@@ -366,24 +366,30 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     if (event.target) event.target.value = ''; // Allow re-selecting the same file
 
     if (file) {
-      const MAX_SIZE_MB = 4;
+      const MAX_SIZE_MB = 10;
       const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
       if (file.size > MAX_SIZE_BYTES) {
         const errorMsg = translations.fileTooLarge[language]
           .replace('{fileSize}', (file.size / 1024 / 1024).toFixed(2))
           .replace('{maxSize}', MAX_SIZE_MB.toString());
-        setUploadError(errorMsg);
-        handleClearLocalFile();
+        onError(errorMsg);
+        setLocalFile(null);
+        onAudioReady(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
         return;
       }
       
+      onError(null);
       setLocalFile(file);
       onAudioReady({ data: file, url: URL.createObjectURL(file) });
       
       // Clear other audio sources
       setSelectedDriveFile(null);
       onDriveFileReady(null);
-      handleClearRecording();
+      resetRecording();
+      setRecordedAudio(null);
     }
   };
 
@@ -538,8 +544,6 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
               </button>
             </div>
           )}
-
-          {uploadError && <p className="text-sm text-red-400 mt-4 text-center">{uploadError}</p>}
         </div>
       )}
 
