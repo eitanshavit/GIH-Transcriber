@@ -13,16 +13,16 @@ export const config = {
 const getPrompt = (language: Language): string => {
   switch (language) {
     case Language.HEBREW:
-      return "תמלל את האודיו הבא לטקסט בעברית. התמלול צריך להיות מדויק לחלוטין. במידת האפשר, חלק את הטקסט לפסקאות.";
+      return "תמלל את האודיו הבא לטקסט בעברית. התמלול צריך להיות מדויק לחלוטין.";
     case Language.ARABIC:
-      return "قم بنسخ الصوت التالي إلى نص باللغة العربية. يجب أن يكون النسخ دقيقًا تمامًا. وحيثما كان ذلك مناسبًا، قم بتقسيم النص إلى فقرات.";
+      return "نسّخ الصوت التالي إلى نص باللغة العربية. يجب أن يكون النسخ دقيقًا تمامًا.";
     case Language.FRENCH:
-      return "Transcrivez l'audio suivant en texte français. La transcription doit être parfaitement exacte. Le cas échéant, divisez le texte en paragraphes.";
+      return "Transcrivez l'audio suivant en texte français. La transcription doit être parfaitement exacte.";
     case Language.SPANISH:
-      return "Transcriba el siguiente audio a texto en español. La transcripción debe ser perfectamente precisa. Cuando sea apropiado, divida el texto en párrafos.";
+      return "Transcribe el siguiente audio a texto en español. La transcripción debe ser perfectamente precisa.";
     case Language.ENGLISH:
     default:
-      return "Transcribe the following audio to English text. The transcription should be perfectly accurate. Where appropriate, break the text into paragraphs.";
+      return "Transcribe the following audio to English text. The transcription should be perfectly accurate.";
   }
 };
 

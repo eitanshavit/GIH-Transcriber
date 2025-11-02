@@ -9,17 +9,27 @@ export default async function handler(req, res) {
 
   // Log the authorization event to the server console for basic tracking.
   console.log("[Auth Notification] A user has authorized the application. Triggering notification process.");
-
-  // Asynchronously send the email alert. We don't need to wait for it to complete
-  // before responding to the client, as the primary action (auth) is complete.
-  // This is a "fire-and-forget" approach.
-  sendAuthorizationEmail().catch(error => {
-    // This catch is for unexpected errors in the sendAuthorizationEmail function itself,
-    // though it's designed to handle its own internal errors gracefully.
-    console.error("[Auth Notification] An unexpected error occurred while dispatching the email notification:", error);
-  });
   
-  // We send a 202 Accepted response because the client doesn't need to wait for
-  // the notification to be sent.
-  return res.status(202).json({ success: true, message: 'Notification processed.' });
+  try {
+    console.log("[Auth Notification] Attempting to send authorization email...");
+    const emailResult = await sendAuthorizationEmail();
+    
+    if (emailResult.success) {
+      console.log("[Auth Notification] Email notification dispatched successfully.");
+      // The primary auth action was successful, and the notification was sent.
+      return res.status(202).json({ success: true, message: 'Notification processed.' });
+    } else {
+      // The email service reported a failure (e.g., missing config, API error).
+      // Log the specific error from the email service for debugging.
+      console.error(`[Auth Notification] Failed to dispatch email notification: ${emailResult.error}`);
+      // We still return a successful status to the client because the primary user-facing
+      // action (authentication) was successful. The notification is a background task.
+      return res.status(202).json({ success: true, message: 'Notification processed with an internal error.' });
+    }
+  } catch (error) {
+    // This catches unexpected errors in the process of calling the email service.
+    console.error("[Auth Notification] An unexpected server error occurred while handling the email notification:", error);
+    // In this case, something went wrong on the server, but we still don't want to fail the client request.
+    return res.status(202).json({ success: true, message: 'Notification processed with an internal error.' });
+  }
 }

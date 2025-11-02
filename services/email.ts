@@ -15,10 +15,9 @@ export const sendAuthorizationEmail = async (): Promise<{ success: boolean; erro
   if (!apiKey || !to || !from) {
     const missing = [!apiKey && 'RESEND_API_KEY', !to && 'NOTIFICATION_EMAIL_TO', !from && 'NOTIFICATION_EMAIL_FROM'].filter(Boolean).join(', ');
     const errorMessage = `Email notifications are not fully configured. Missing environment variables: ${missing}`;
-    console.warn(`[Email Service] ${errorMessage}`);
-    // We don't want to fail the user's auth flow if email config is missing.
-    // The primary function (auth) succeeded. This is just a notification.
-    return { success: true }; 
+    console.error(`[Email Service] ${errorMessage}`);
+    // Return a failure state so the calling API route can log this configuration error.
+    return { success: false, error: errorMessage }; 
   }
 
   const payload: EmailPayload = {
