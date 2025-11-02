@@ -3,6 +3,7 @@ import { Language } from './types';
 import { Header } from './components/Header';
 import { AudioHandler } from './components/AudioHandler';
 import { TranscriptionBox } from './components/TranscriptionBox';
+import { PasswordProtection } from './components/PasswordProtection';
 import { transcribeFromDrive } from './services/gemini';
 import { fileToBase64 } from './utils/file';
 
@@ -55,6 +56,7 @@ const translations = {
 
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [language, setLanguage] = useState<Language>(Language.HEBREW);
   const [audioData, setAudioData] = useState<{ data: File | Blob; url: string } | null>(null);
   const [driveFile, setDriveFile] = useState<{ id: string; name: string; accessToken: string} | null>(null);
@@ -66,6 +68,10 @@ const App: React.FC = () => {
   useEffect(() => {
     // Detect if the app is running in an iframe
     setIsInIframe(window.self !== window.top);
+    // Check session storage for authentication
+    if (sessionStorage.getItem('isAuthenticated') === 'true') {
+      setIsAuthenticated(true);
+    }
   }, []);
 
 
@@ -85,6 +91,29 @@ const App: React.FC = () => {
 
   }, [language]);
 
+  const handleLogin = async (password: string): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.ok) {
+        setIsAuthenticated(true);
+        sessionStorage.setItem('isAuthenticated', 'true');
+        return null;
+      } else {
+        const errorData = await response.json();
+        return errorData.error || 'Login failed.';
+      }
+    } catch (err) {
+      console.error(err);
+      return 'An unexpected error occurred during login.';
+    }
+  };
+
+
   const handleTranscribe = useCallback(async () => {
     if (!audioData && !driveFile) {
       setError(translations.error.noAudio[language]);
@@ -100,17 +129,6 @@ const App: React.FC = () => {
       if (driveFile) {
         result = await transcribeFromDrive(driveFile.id, driveFile.accessToken, language);
       } else if (audioData) {
-        // Fallback for recorded audio (which is small) - use the old API
-        // This requires the old API endpoint to exist.
-        // For simplicity, let's just make recorded audio use the Drive path too.
-        // The user would have to save it and upload.
-        // A better UX would be to upload the blob to drive, but that's more complex.
-        // For now, let's assume recorded audio uses a different path if needed or is disabled.
-        // The simplest path: only allow transcription from Drive for now.
-        // Let's modify transcribeFromDrive to handle base64 for recorded files.
-        // No, let's create a new endpoint for simplicity. Let's call it /api/transcribe-blob
-        // This is getting complex. For this change, let's focus on the user's request.
-        // I'll re-add the original transcribe api endpoint and use that for blobs.
         const base64Audio = await fileToBase64(audioData.data);
         const response = await fetch('/api/transcribe', {
             method: 'POST',
@@ -140,6 +158,10 @@ const App: React.FC = () => {
       setIsTranscribing(false);
     }
   }, [audioData, driveFile, language]);
+  
+  if (!isAuthenticated) {
+    return <PasswordProtection onLogin={handleLogin} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans flex flex-col items-center p-4">
