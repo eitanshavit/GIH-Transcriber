@@ -371,7 +371,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     onError(null); // Clear global error as well
 
     if (file) {
-      const MAX_SIZE_MB = 10;
+      const MAX_SIZE_MB = 4;
       const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
       if (file.size > MAX_SIZE_BYTES) {
         const errorMsg = translations.fileTooLarge[language]
