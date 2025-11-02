@@ -1,4 +1,5 @@
 // api/notify-auth.ts
+import { sendAuthorizationEmail } from '../services/email.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -6,30 +7,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const notificationEmail = process.env.NOTIFICATION_EMAIL_TO;
+  // Log the authorization event to the server console for basic tracking.
+  console.log("[Auth Notification] A user has authorized the application. Triggering notification process.");
 
-  if (notificationEmail) {
-    // In a real-world application, you would integrate an email service here
-    // (e.g., SendGrid, Resend, Nodemailer) to send an actual email.
-    // For security and simplicity, we are logging to the server console instead.
-    // You can view these logs in your Vercel project's dashboard.
-    console.log(`[Auth Notification] A user has authorized the application. Sending alert to: ${notificationEmail}`);
-    
-    // Example with a hypothetical email service:
-    // await sendEmail({
-    //   to: notificationEmail,
-    //   from: 'noreply@your-app.com',
-    //   subject: 'New User Authorization on Audio Transcriber',
-    //   body: 'A user has successfully connected their Google Account to the audio transcriber application.'
-    // });
-
-  } else {
-    // It's also useful to know if the notification system is being triggered
-    // but isn't configured.
-    console.log("[Auth Notification] A user authorized the app, but the NOTIFICATION_EMAIL_TO environment variable is not set.");
-  }
-
+  // Asynchronously send the email alert. We don't need to wait for it to complete
+  // before responding to the client, as the primary action (auth) is complete.
+  // This is a "fire-and-forget" approach.
+  sendAuthorizationEmail().catch(error => {
+    // This catch is for unexpected errors in the sendAuthorizationEmail function itself,
+    // though it's designed to handle its own internal errors gracefully.
+    console.error("[Auth Notification] An unexpected error occurred while dispatching the email notification:", error);
+  });
+  
   // We send a 202 Accepted response because the client doesn't need to wait for
-  // the notification to be sent. It's a fire-and-forget action.
+  // the notification to be sent.
   return res.status(202).json({ success: true, message: 'Notification processed.' });
 }
