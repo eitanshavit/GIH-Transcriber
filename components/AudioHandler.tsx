@@ -154,6 +154,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   // --- State for local file upload ---
   const [localFile, setLocalFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // --- Recorder State & Logic ---
   const { isRecording, audioBlob, startRecording, stopRecording, resetRecording } = useRecorder();
@@ -166,6 +167,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
   const handleClearLocalFile = useCallback(() => {
     setLocalFile(null);
     onAudioReady(null);
+    setUploadError(null);
     onError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -365,6 +367,9 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     const file = event.target.files?.[0];
     if (event.target) event.target.value = ''; // Allow re-selecting the same file
 
+    setUploadError(null); // Clear previous errors on new attempt
+    onError(null); // Clear global error as well
+
     if (file) {
       const MAX_SIZE_MB = 10;
       const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
@@ -372,7 +377,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
         const errorMsg = translations.fileTooLarge[language]
           .replace('{fileSize}', (file.size / 1024 / 1024).toFixed(2))
           .replace('{maxSize}', MAX_SIZE_MB.toString());
-        onError(errorMsg);
+        setUploadError(errorMsg);
         setLocalFile(null);
         onAudioReady(null);
         if (fileInputRef.current) {
@@ -381,6 +386,7 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
         return;
       }
       
+      setUploadError(null);
       onError(null);
       setLocalFile(file);
       onAudioReady({ data: file, url: URL.createObjectURL(file) });
@@ -397,6 +403,11 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const changeTab = (tab: 'drive' | 'record' | 'upload') => {
+    setUploadError(null); // Clear file-specific errors when changing context
+    setActiveTab(tab);
   };
   
   const areApisReady = gapiLoaded && gisLoaded;
@@ -483,21 +494,21 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
     <div className="w-full bg-gray-800 rounded-lg p-4 sm:p-6 mt-6">
       <div className="flex border-b border-gray-700 mb-4">
         <button
-          onClick={() => setActiveTab('drive')}
+          onClick={() => changeTab('drive')}
           disabled={isTranscribing}
           className={`px-4 py-2 font-medium transition-colors disabled:opacity-50 ${activeTab === 'drive' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
         >
           {translations.drive[language]}
         </button>
         <button
-          onClick={() => setActiveTab('upload')}
+          onClick={() => changeTab('upload')}
           disabled={isTranscribing}
           className={`px-4 py-2 font-medium transition-colors disabled:opacity-50 ${activeTab === 'upload' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
         >
           {translations.upload[language]}
         </button>
         <button
-          onClick={() => setActiveTab('record')}
+          onClick={() => changeTab('record')}
           disabled={isTranscribing}
           className={`px-4 py-2 font-medium transition-colors disabled:opacity-50 ${activeTab === 'record' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
         >
@@ -542,6 +553,11 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
               >
                 {translations.clearSelection[language]}
               </button>
+            </div>
+          )}
+          {uploadError && (
+            <div className="mt-2 text-sm text-red-400 text-center max-w-md">
+                {uploadError}
             </div>
           )}
         </div>
