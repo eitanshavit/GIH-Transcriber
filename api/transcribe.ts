@@ -5,7 +5,7 @@ import { Language } from '../types.js';
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '4mb',
     },
   },
 };
