@@ -277,15 +277,16 @@ export const AudioHandler: React.FC<AudioHandlerProps> = ({ onAudioReady, onDriv
                 <ol className="list-decimal list-inside space-y-2 text-xs">
                     <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Google Cloud Console</a>.</li>
                     <li>Ensure the <strong>Google Drive API</strong> and <strong>Google Picker API</strong> are enabled for your project.</li>
-                    <li>Create an <strong>API Key</strong>. <strong>Important:</strong> Ensure it has no restrictions, or that it's restricted to your app's URL. An "invalid key" error often means your key is restricted.</li>
                     <li>Create an <strong>OAuth 2.0 Client ID</strong> of type "Web Application".</li>
-                    <li className="font-bold">For the OAuth Client ID, you <strong>must</strong> add your app's URL to the list of <strong>"Authorized JavaScript origins"</strong>.</li>
+                    <li className="font-bold">Under "Authorized JavaScript origins", add your app's exact URL.</li>
+                    <li>Create an <strong>API Key</strong>.</li>
+                    <li className="font-bold">For the API Key, under "Website restrictions", add your app's URL in the format `your-app-name.vercel.app/*`. Do not include `https://`. An "invalid key" error is almost always caused by this restriction being misconfigured.</li>
                 </ol>
                 
                 {origin && (
                     <div className="!mt-4 p-3 bg-indigo-900/50 border border-indigo-700 rounded-md">
                         <p className="text-xs text-indigo-200 font-semibold">
-                            Add this exact URL to your "Authorized JavaScript origins":
+                            Your "Authorized JavaScript origin" is:
                         </p>
                         <code className="block w-full bg-gray-900 text-yellow-300 p-2 mt-2 rounded-md text-sm break-all">
                             {origin}
