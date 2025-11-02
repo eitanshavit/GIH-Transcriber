@@ -63,7 +63,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Error in /api/transcribe:", error);
-    const message = error instanceof Error ? error.message : "An unknown error occurred.";
+    const message = error instanceof Error ? error.message : "An unknown error occurred!";
     return res.status(500).json({ error: `Failed to transcribe audio. ${message}` });
   }
 }
